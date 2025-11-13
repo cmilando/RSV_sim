@@ -38,11 +38,12 @@ ppl = ss.People(n_agents=1e5,
 # ===========================================
 mps = ss.MixingPools(
     
-    #
-    diseases = 'sis',
+    # Options for this are: 'sir', 'sis', ...
+    diseases = 'sir',
     
     # overall transmission via these mixing pools
-    beta = 0.1,
+    # NB: Need to understand what this actually means
+    beta = 1.2,
     
     # SOURCE
     # NB: Make these a lambda sim so you can define locations
@@ -66,10 +67,11 @@ mps = ss.MixingPools(
                               (sim.people.urban == False)).uids},
     
     # CONTACT MATRIX
-    n_contacts = [[1.0, 1.0, 1.0, 1.0], 
-                  [1.0, 1.0, 1.0, 1.0],
-                  [1.0, 1.0, 1.0, 1.0],
-                  [1.0, 1.0, 1.0, 1.0]]
+    n_contacts = np.multiply(
+        [[1.0, 10.0, 1.0, 1.0],
+         [10.0, 1.0, 1.0, 1.0],
+         [1.0, 1.0, 1.0, 1.0],
+         [1.0, 1.0, 1.0, 1.0]], 10)
 )
 
 
@@ -132,7 +134,7 @@ class infections_by_grp(ss.Analyzer):
                 label=f'Age {min_age}-{max_age} rural'
             )
         plt.legend(frameon=False)
-        plt.xlabel('Model time (days)')
+        plt.xlabel('Model time')
         plt.ylabel('Individuals infected')
         plt.ylim(bottom=0)
         sc.boxoff()
@@ -146,10 +148,17 @@ class infections_by_grp(ss.Analyzer):
 # ///////////////////////////////////////////
 # ===========================================
 sim = ss.Sim(
-    diseases = 'sis',
+    diseases = 'sir',
     networks = mps,
     people   = ppl,
-    analyzers = infections_by_grp())
+    analyzers = infections_by_grp(),
+    start = 2000,
+    stop = 2010,
+    dt = 0.1)
+
+    # start = 2000,
+    # stop = 2010,
+    # dt = ss.years(0.1)
 
 sim.run()
 
