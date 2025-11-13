@@ -13,13 +13,14 @@ import matplotlib.pyplot as plt
 # splits across the break in age groups below
 # ///////////////////////////////////////////
 # ===========================================
-## import the age matrix
+# import the age matrix
 age_data = pd.read_csv('age.csv')
 
 # make the people object
-# NB: n_agents needs to be large enough for things
+# NB: (1) n_agents needs to be large enough for things
 #     to conform to expectations
-ppl = ss.People(n_agents=1e5, age_data=age_data)
+ppl = ss.People(n_agents=1e5, 
+                age_data=age_data)
 
 # ===========================================
 # ///////////////////////////////////////////
@@ -27,17 +28,23 @@ ppl = ss.People(n_agents=1e5, age_data=age_data)
 # ///////////////////////////////////////////
 # ===========================================
 mps = ss.MixingPools(
-    ##
+    
+    #
     diseases = 'sis',
-    ##
+    
+    # overall transmission via these mixing pools
     beta = 0.1,
-    ## SOURCE
-    src = {'0-20': ss.AgeGroup(0, 20), 
-           '20+': ss.AgeGroup(20, None)},
-    ## DESTINATION
-    dst = {'0-20': ss.AgeGroup(0, 20), 
-           '20+': ss.AgeGroup(20, None)},
-    ## CONTACT MATRIX
+    
+    # SOURCE
+    # NB: Make these a lambda sim so you can define locations
+    src = {'0-20': lambda sim: (sim.people.age < 20).uids, 
+           '20+': lambda sim: (sim.people.age >= 20).uids},
+    
+    # DESTINATION
+    dst = {'0-20': lambda sim: (sim.people.age < 20).uids, 
+           '20+': lambda sim: (sim.people.age >= 20).uids},
+    
+    # CONTACT MATRIX
     n_contacts = [[1.0, 1.0], # A-A, A-B
                   [1.0, 1.0]], # B-A, B-B
 )
@@ -94,8 +101,7 @@ sim = ss.Sim(
     diseases = 'sis',
     networks = mps,
     people   = ppl,
-    analyzers = infections_by_age(),
-    verbose = False)
+    analyzers = infections_by_age())
 
 sim.run()
 
