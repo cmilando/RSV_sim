@@ -3,8 +3,11 @@
 [DOCS](https://docs.starsim.org/tutorials/t5_networks.html)
 
 TODO:
-* Next step is figuring out the 2d mixing matri
-* then calibration against real data
+* then calibration against real data [link](https://docs.starsim.org/user_guide/workflows_calibration.html)
+
+* contact matrices for every age [link](https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1009098)
+
+
 
 ## Setup
 only works with version 3.13

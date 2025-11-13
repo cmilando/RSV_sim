@@ -46,7 +46,7 @@ mps = ss.MixingPools(
     beta = 1.2,
     
     # SOURCE
-    # NB: Make these a lambda sim so you can define locations
+    # NB: Make these a lambda sim so you can define locations               
     src = {'0-20 - URBAN': lambda sim: ((sim.people.age < 20) & 
                                         (sim.people.urban == True)).uids, 
            '0-20 - RURAL': lambda sim: ((sim.people.age < 20) & 

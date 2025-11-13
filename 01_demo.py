@@ -30,10 +30,10 @@ ppl = ss.People(n_agents=1e5,
 mps = ss.MixingPools(
     
     #
-    diseases = 'sis',
+    diseases = 'sir',
     
     # overall transmission via these mixing pools
-    beta = 0.1,
+    beta = 1.2,
     
     # SOURCE
     # NB: Make these a lambda sim so you can define locations
@@ -45,8 +45,9 @@ mps = ss.MixingPools(
            '20+': lambda sim: (sim.people.age >= 20).uids},
     
     # CONTACT MATRIX
-    n_contacts = [[1.0, 1.0], # A-A, A-B
-                  [1.0, 1.0]], # B-A, B-B
+    n_contacts = np.multiply(
+        [[1.0, 10.0], # A-A, A-B
+         [1.0, 1.0]], 10), # B-A, B-B
 )
 
 
@@ -98,7 +99,7 @@ class infections_by_age(ss.Analyzer):
 # ///////////////////////////////////////////
 # ===========================================
 sim = ss.Sim(
-    diseases = 'sis',
+    diseases = 'sir',
     networks = mps,
     people   = ppl,
     analyzers = infections_by_age())
