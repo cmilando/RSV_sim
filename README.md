@@ -2,16 +2,21 @@
 
 [DOCS](https://docs.starsim.org/tutorials/t5_networks.html)
 
-Figured out how to make conditional location states
-
 TODO:
 
-* Change to SEIR
-
 * contact matrices for every age [link](https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1009098)
+> and the link that Allison sent
 
 * then calibration against real data [link](https://docs.starsim.org/user_guide/workflows_calibration.html)
 > you can make a dummy example for this that gets you back what you put in
+
+> next steps:
+> * make a simplified block contact matrix
+> * run the full pipeline
+> * create some simulated data
+> * do a calibration step to get back out the inputs
+> * change model type to sier?
+> * then start applying with real data
 
 ## Files
 

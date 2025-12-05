@@ -49,9 +49,10 @@ ppl = ss.People(n_agents=n_agents,
 # 
 # The first step was making them lambda functions so they can take a state
 #
-# Note: Since you are taking in the contact matrices on the fly
-#       you could hard code it, or you could write a function that makes
-#       lambda functions ...
+# Then writing a function that makes lambda functions 
+#
+# Finally, building the block contact matrix, largely the identity in blocks
+#
 # ///////////////////////////////////////////////////////////////////////////////
 # ===============================================================================
 
@@ -63,7 +64,7 @@ def in_grp(simobj, age_min, age_max, check_location):
 # then create the two dictionaries
 age_breaks = [0, 20, 100] 
 locations = ['HOUSEHOLD', 'SCHOOL', 'COMMUNITY']
-base_dict_const = {}
+base_dict = {}
 for loc_i, loc in enumerate(locations):
     for age_i in range(1, len(age_breaks)):
         age_min = age_breaks[age_i-1]
@@ -71,10 +72,27 @@ for loc_i, loc in enumerate(locations):
         nm = f'{age_min}-{age_max} - {loc}'
         # need to pass these things in as function arguments
         # if you define their defaults it works
-        base_dict_const[nm] = lambda xsim, li=loc_i, ai=age_min, ax=age_max: \
+        base_dict[nm] = lambda xsim, li=loc_i, ai=age_min, ax=age_max: \
             in_grp(xsim, ai, ax, li)
 
-base_dict = base_dict_const
+# Now read in the contact matrix
+# the column is destination, the row is source
+# dest: A  B
+#      [0, 0]
+#      [1, 0] 
+# means coming from B -> A, so only A increases
+n_contacts_data = pd.read_csv('contact_matrix.csv', header=None)
+
+n_contacts_data = [[1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+         [1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+         [1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+         [1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+         [1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+         [1.0, 1.0, 1.0, 1.0, 1.0, 1.0]]
+
+# scale it so represents the number of individuals contacting in each ?
+n_contacts = np.multiply(n_contacts_data, 10)
+
 
 mps = ss.MixingPools(
     
@@ -92,18 +110,7 @@ mps = ss.MixingPools(
     dst = base_dict,
     
     # CONTACT MATRIX
-    # the column is destination, the row is source
-    # dest: A  B
-    #      [0, 0]
-    #      [1, 0] 
-    # means coming from B -> A, so only A increases
-    n_contacts = np.multiply(
-        [[1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
-         [1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
-         [1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
-         [1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
-         [1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
-         [1.0, 1.0, 1.0, 1.0, 1.0, 1.0]], 10)
+    n_contacts = n_contacts
 )
 
 
