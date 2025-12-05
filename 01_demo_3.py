@@ -2,55 +2,52 @@ import numpy as np
 import pandas as pd
 import sciris as sc
 import starsim as ss
+import random
 import matplotlib.pyplot as plt
 
-# ===========================================
-# ///////////////////////////////////////////
+# ===============================================================================
+# ///////////////////////////////////////////////////////////////////////////////
 # AGE MATRIX -> People object
 #
 # there is some randomness which is introduced here
 # right now i just have people in ages 10 and 20 so it
 # splits across the break in age groups below
-# ///////////////////////////////////////////
-# ===========================================
+# ///////////////////////////////////////////////////////////////////////////////
+# ===============================================================================
 # import the age matrix
 age_data = pd.read_csv('age.csv')
 
 # create a location state
-
-def my_state(self):
-    self.state = 'Test'
-    return self
-
-# Add it to the class
-ss.People.my_state = my_state
-
-
-def urban_function(n):
-    """ Make a function to randomly assign people 
-        to urban/rural locations """ 
-    return np.random.choice(a=[True, False], p=[0.5, 0.5], size=n)
-
-urban = ss.BoolState('urban', default=urban_function)
+def location_fcn(n):
+    """ 
+    Make a function to assign people to locations.
+    This ultimately happens after the sim.init() step because
+    this state is conditional on age. So for now just put a placeholder
+    and you can randomize later with different probabilities.
+    But the locations will be
+    1 - household
+    2 - school
+    3 - community
+    """ 
+    locs = [0]
+    return np.random.choice(locs, size = n)
+    
+location = ss.FloatArr('location', default=location_fcn)
 
 # make the people object
 # NB: (1) n_agents needs to be large enough for things
 #     to conform to expectations
 #     (2) added a location state that we can use later
-ppl = ss.People(n_agents=1e5, 
-                age_data=age_data)
+n_agents = 1e3
+ppl = ss.People(n_agents=n_agents, 
+                age_data=age_data,
+                extra_states=location)
 
-# now that you've defined age, set the location of each person
-
-
-
-ppl.disp()
-
-# ===========================================
-# ///////////////////////////////////////////
+# ===============================================================================
+# ///////////////////////////////////////////////////////////////////////////////
 # MIXING POOLS
-# ///////////////////////////////////////////
-# ===========================================
+# ///////////////////////////////////////////////////////////////////////////////
+# ===============================================================================
 mps = ss.MixingPools(
     
     # Options for this are: 'sir', 'sis', ...
@@ -62,39 +59,54 @@ mps = ss.MixingPools(
     
     # SOURCE
     # NB: Make these a lambda sim so you can define locations               
-    src = {'0-20 - URBAN': lambda sim: ((sim.people.age < 20) & 
-                                        (sim.people.urban == True)).uids, 
-           '0-20 - RURAL': lambda sim: ((sim.people.age < 20) & 
-                                        (sim.people.urban == False)).uids,
-           '20+ - URBAN': lambda sim: ((sim.people.age >= 20) &
-                              (sim.people.urban == True)).uids,
-           '20+ - RURAL': lambda sim: ((sim.people.age >= 20) &
-                              (sim.people.urban == False)).uids},
+    src = {'0-20 - HOUSEHOLD': 
+           lambda sim: ((sim.people.age < 20) & (sim.people.location == 1)).uids,
+           '20+  - HOUSEHOLD': 
+           lambda sim: ((sim.people.age >= 20) & (sim.people.location == 1)).uids, 
+           '0-20 - SCHOOL': 
+           lambda sim: ((sim.people.age < 20) & (sim.people.location == 2)).uids,
+           '20+  - SCHOOL': 
+           lambda sim: ((sim.people.age >= 20) & (sim.people.location == 2)).uids,
+           '0-20 - COMMUNITY': 
+           lambda sim: ((sim.people.age < 20) & (sim.people.location == 3)).uids,
+           '20+  - COMMUNITY': 
+           lambda sim: ((sim.people.age >= 20) & (sim.people.location == 3)).uids},
     
     # DESTINATION
-    dst = {'0-20 - URBAN': lambda sim: ((sim.people.age < 20) & 
-                                        (sim.people.urban == True)).uids, 
-           '0-20 - RURAL': lambda sim: ((sim.people.age < 20) & 
-                                        (sim.people.urban == False)).uids,
-           '20+ - URBAN': lambda sim: ((sim.people.age >= 20) &
-                              (sim.people.urban == True)).uids,
-           '20+ - RURAL': lambda sim: ((sim.people.age >= 20) &
-                              (sim.people.urban == False)).uids},
+    dst = {'0-20 - HOUSEHOLD': 
+           lambda sim: ((sim.people.age < 20) & (sim.people.location == 1)).uids,
+           '20+  - HOUSEHOLD': 
+           lambda sim: ((sim.people.age >= 20) & (sim.people.location == 1)).uids, 
+           '0-20 - SCHOOL': 
+           lambda sim: ((sim.people.age < 20) & (sim.people.location == 2)).uids,
+           '20+  - SCHOOL': 
+           lambda sim: ((sim.people.age >= 20) & (sim.people.location == 2)).uids,
+           '0-20 - COMMUNITY': 
+           lambda sim: ((sim.people.age < 20) & (sim.people.location == 3)).uids,
+           '20+  - COMMUNITY': 
+           lambda sim: ((sim.people.age >= 20) & (sim.people.location == 3)).uids},
     
     # CONTACT MATRIX
+    # the column is destination, the row is source
+    # dest: A  B
+    #      [0, 0]
+    #      [1, 0] 
+    # means coming from B -> A, so only A increases
     n_contacts = np.multiply(
-        [[1.0, 10.0, 1.0, 1.0],
-         [10.0, 1.0, 1.0, 1.0],
-         [1.0, 1.0, 1.0, 1.0],
-         [1.0, 1.0, 1.0, 1.0]], 10)
+        [[1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+         [1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+         [1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+         [1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+         [1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+         [1.0, 1.0, 1.0, 1.0, 1.0, 1.0]], 10)
 )
 
 
-# ===========================================
-# ///////////////////////////////////////////
+# ===============================================================================
+# ///////////////////////////////////////////////////////////////////////////////
 # Analyzer
-# ///////////////////////////////////////////
-# ===========================================
+# ///////////////////////////////////////////////////////////////////////////////
+# ===============================================================================
 class infections_by_grp(ss.Analyzer):
     """ Count infections by age and location"""
     def __init__(self, age_bins=(0, 20, 100)):
@@ -103,7 +115,7 @@ class infections_by_grp(ss.Analyzer):
         self.mins = age_bins[:-1]
         self.maxes = age_bins[1:]
         self.hist = {
-            min_age: {'urban': [], 'rural': []}
+            min_age: {'hh': [], 'com': [], 'sch': []}
             for min_age in self.mins
         }
         return
@@ -115,18 +127,22 @@ class infections_by_grp(ss.Analyzer):
 
     def step(self):
         age = self.sim.people.age
-        urban = self.sim.people.urban  
+        location = self.sim.people.location
         disease = self.sim.diseases[0]
         for min_age, max_age in zip(self.mins, self.maxes):
             mask_age = (age >= min_age) & (age < max_age)
 
-            # Urban
-            mask_urban = (mask_age) & (urban == True)
-            self.hist[min_age]['urban'].append(disease.infected[mask_urban].sum())
+            # Household
+            mask_hh = (mask_age) & (location == 1)
+            self.hist[min_age]['hh'].append(disease.infected[mask_hh].sum())
 
-            # Rural
-            mask_rural = (mask_age) & (urban == False)
-            self.hist[min_age]['rural'].append(disease.infected[mask_rural].sum())
+            # Community
+            mask_com = (mask_age) & (location == 2)
+            self.hist[min_age]['com'].append(disease.infected[mask_com].sum())
+
+            # School
+            mask_sch = (mask_age) & (location == 3)
+            self.hist[min_age]['sch'].append(disease.infected[mask_sch].sum())
             
         return
 
@@ -134,19 +150,26 @@ class infections_by_grp(ss.Analyzer):
         plt.figure()
         x = self.sim.t.tvec
         for min_age, max_age in zip(self.mins, self.maxes):
-            # Urban line
+            # Household line
             plt.plot(
                 x,
-                self.hist[min_age]['urban'],
-                label=f'Age {min_age}-{max_age} urban'
+                self.hist[min_age]['hh'],
+                linestyle='solid',
+                label=f'Age {min_age}-{max_age} household'
             )
-
-            # Rural line (dashed)
+            # Community line (dashed)
             plt.plot(
                 x,
-                self.hist[min_age]['rural'],
-                linestyle='--',
-                label=f'Age {min_age}-{max_age} rural'
+                self.hist[min_age]['com'],
+                linestyle='dashed',
+                label=f'Age {min_age}-{max_age} community'
+            )
+            # School line
+            plt.plot(
+                x,
+                self.hist[min_age]['sch'],
+                linestyle='dotted',
+                label=f'Age {min_age}-{max_age} school'
             )
         plt.legend(frameon=False)
         plt.xlabel('Model time')
@@ -157,11 +180,11 @@ class infections_by_grp(ss.Analyzer):
         return
 
 
-# ===========================================
-# ///////////////////////////////////////////
-# RUN
-# ///////////////////////////////////////////
-# ===========================================
+# ===============================================================================
+# ///////////////////////////////////////////////////////////////////////////////
+# Run
+# ///////////////////////////////////////////////////////////////////////////////
+# ===============================================================================
 sim = ss.Sim(
     diseases = 'sir',
     networks = mps,
@@ -171,10 +194,34 @@ sim = ss.Sim(
     stop = 2010,
     dt = 0.1)
 
-    # start = 2000,
-    # stop = 2010,
-    # dt = ss.years(0.1)
+# do this step first
+sim.init()
 
+# now you can see that people is initialized
+sim.people.to_df()
+
+# now you can set conditional location state based on age
+# In [1]: import random
+# In [2]: random.choices(
+# ...:     population=[['a','b'], ['b','a'], ['c','b']],
+# ...:     weights=[0.2, 0.2, 0.6],
+# ...:     k=10
+# ...: )
+# and remember that these are the locations
+#     1 - household
+#     2 - school
+#     3 - community
+for i in range(int(n_agents)):
+    if sim.people.age[i] < 19:
+        sim.people.location[i] = \
+            random.choices([1, 2, 3], [.33, .33, .33], k=1)[0]
+    else:
+        sim.people.location[i] = \
+            random.choices([1, 2, 3], [.20, .10, .70], k=1)[0]
+
+sim.people.to_df()
+
+#
 sim.run()
 
 sim.analyzers.infections_by_grp.plot()

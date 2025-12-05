@@ -2,12 +2,21 @@
 
 [DOCS](https://docs.starsim.org/tutorials/t5_networks.html)
 
+Figured out how to make conditional location states
+
 TODO:
-* then calibration against real data [link](https://docs.starsim.org/user_guide/workflows_calibration.html)
+
+* Change to SEIR
 
 * contact matrices for every age [link](https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1009098)
 
+* then calibration against real data [link](https://docs.starsim.org/user_guide/workflows_calibration.html)
+> you can make a dummy example for this that gets you back what you put in
 
+
+## Work
+
+`start.sh`
 
 ## Setup
 only works with version 3.13

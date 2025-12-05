@@ -27,7 +27,8 @@ urban = ss.BoolState('urban', default=urban_function)
 # NB: (1) n_agents needs to be large enough for things
 #     to conform to expectations
 #     (2) added a location state that we can use later
-ppl = ss.People(n_agents=1e5, 
+n_agents = 1e5
+ppl = ss.People(n_agents=n_agents, 
                 age_data=age_data,
                 extra_states=urban)
 
@@ -67,8 +68,13 @@ mps = ss.MixingPools(
                               (sim.people.urban == False)).uids},
     
     # CONTACT MATRIX
+    # the column is destination, the row is source
+    # dest: A  B
+    #      [0, 0]
+    #      [1, 0] 
+    # means coming from B -> A, so only A increases
     n_contacts = np.multiply(
-        [[1.0, 10.0, 1.0, 1.0],
+        [[1.0, 1.0, 1.0, 1.0],
          [10.0, 1.0, 1.0, 1.0],
          [1.0, 1.0, 1.0, 1.0],
          [1.0, 1.0, 1.0, 1.0]], 10)
@@ -156,10 +162,19 @@ sim = ss.Sim(
     stop = 2010,
     dt = 0.1)
 
-    # start = 2000,
-    # stop = 2010,
-    # dt = ss.years(0.1)
+# do this step
+sim.init()
 
+# now you can set conditional state ???
+for i in range(int(n_agents)):
+    if sim.people.age[i] > 19:
+        sim.people.urban[i] = True
+    else:
+        sim.people.urban[i] = False
+
+sim.people.to_df()
+
+#
 sim.run()
 
 sim.analyzers.infections_by_grp.plot()
