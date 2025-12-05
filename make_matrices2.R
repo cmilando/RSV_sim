@@ -54,7 +54,7 @@ mat <- mat / max(mat)   # scale to [0,1]
 ## -------- 2. Split mat into 4 blocky components --------
 
 n <- nrow(mat)
-K <- 4               # number of components
+K <- 3               # number of components
 block_size <- 10     # side length of each block in cells
 
 # how many blocks in each direction (round up)
@@ -137,19 +137,21 @@ plot_comp <- function(comp, title) {
                          limits = c(0, 1)) +
     coord_fixed() +
     ggtitle(title) +
-    theme_minimal()
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
 }
 
 # Example: plot components 1–4
-plot_comp(components[[1]], "Component 1")
-plot_comp(components[[2]], "Component 2")
-plot_comp(components[[3]], "Component 3")
-plot_comp(components[[4]], "Component 4")
+library(patchwork)
+p1 <- plot_comp(components[[1]], "Household")
+p2 <- plot_comp(components[[2]], "School")
+p3 <- plot_comp(components[[3]], "Community")
 
-plot_comp(components[[1]] +
+p4 <- plot_comp(components[[1]] +
             components[[2]] +
-            components[[3]] +
-            components[[4]], "Components all")
+            components[[3]], "Combined")
+
+(p1 + p2) / (p3 + p4) + plot_layout(guides = 'collect')
 
 ## -------- 4. Write to XLSX --------
 library(writexl)
@@ -158,15 +160,14 @@ library(writexl)
 # convert each matrix to a data frame for Excel
 full_comp <- components[[1]] +
   components[[2]] +
-  components[[3]] +
-  components[[4]]
+  components[[3]]
 
-components[[5]] <- full_comp
+components[[4]] <- full_comp
 
 components_dfs <- lapply(components, as.data.frame)
 
 # give each sheet a name
-names(components_dfs) <- c(paste0("component_", 1:4),"components_full")
+names(components_dfs) <- c("Household", 'School', 'Community', 'Combined')
 
 # write to a single Excel workbook
 write_xlsx(components_dfs, "components_decomposition.xlsx")

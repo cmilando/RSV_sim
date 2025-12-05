@@ -13,13 +13,16 @@ TODO:
 * then calibration against real data [link](https://docs.starsim.org/user_guide/workflows_calibration.html)
 > you can make a dummy example for this that gets you back what you put in
 
+## Files
 
-## Work
+* 01_demo : basic model with a set age structure
+* 02_demo : added a random urban/rural state
+* 03_demo : modified the state to be conditional on age
+* 04_demo : take a xlsx of the contact matrices
 
-`start.sh`
+## Setup and Run
 
-## Setup
-only works with version 3.13
+Note: only works with python version 3.13
 
 Create a virtual environment with v3.13 with homebrew, after navigating to the Github folder
 ```
