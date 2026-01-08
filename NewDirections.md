@@ -19,6 +19,11 @@ whereas we want a matrix (kids to kids, kids to adults, adults to kids etc )
 (3) and relatedly no way to have a 3-D contact matrix (so all-ages to all-ages in
 school home or work etc)
 
+Its also not the case that python is better for this task: https://www.reddit.com/r/datascience/comments/16dk5b6/r_vs_python_detailed_examples_from_proficient/
+there are some benefits of the object oriented programming but also some
+features that we probably don't need, and some overhead that also comes from
+working in a language where it may be hard to debug what is going on.
+
 ## And so
 
 We are going to build a hybrid compartment and agent-based model to get the things 
