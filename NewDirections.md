@@ -58,9 +58,9 @@ So the way we will calibrate to the contact matrix is to have
 
 known:
 
-* poisson mu for househould size
-* poisson mu for school size
-* poisson mu for work size
+* poisson mu for househould size (basically, 1000 numbers since we know ACS)
+* poisson mu for school size (again, known from ACS data)
+* poisson mu for work size (and known from BLS etc data, 1000 numbers)
 
 unknown:
 
@@ -71,6 +71,8 @@ target:
 * contact matrix 
 
 need to figure out the correct units for p(exposure) but we have all the details we need
+
+We can do this in STAN pretty easily and just has to be done once.
 
 from this we'll know how large each community should be, and these will be randomly assigned
 once
