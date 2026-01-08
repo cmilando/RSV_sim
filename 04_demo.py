@@ -57,6 +57,7 @@ ppl = ss.People(n_agents=n_agents,
 # ===============================================================================
 
 # first define the base function
+# which defines people by age group and by location
 def in_grp(simobj, age_min, age_max, check_location):
     return ((simobj.people.age >= age_min) & (simobj.people.age < age_max) &
             (simobj.people.location == check_location)).uids
@@ -77,9 +78,9 @@ for loc_i, loc in enumerate(locations):
 
 # Now read in the contact matrix
 # the column is destination, the row is source
-# dest: A  B
-#      [0, 0]
-#      [1, 0] 
+#  dest: A  B
+# A     [0, 0]
+# B     [1, 0] 
 # means coming from B -> A, so only A increases
 n_contacts_data = pd.read_csv('contact_matrix.csv', header=None)
 
