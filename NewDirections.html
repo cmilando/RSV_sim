@@ -357,7 +357,8 @@ display: none;
 <p>Chad Milando</p>
 <p>Thoughts on the RSV modeling project. TLDR is I think it makes sense
 to build the hybrid compartmental-agent based model that we talked about
-today, using R and Rcpp to make the computations faster.</p>
+today, using R and <a href="https://cran.r-project.org/web/packages/Rcpp/vignettes/Rcpp-introduction.pdf">Rcpp</a>
+to make the computations faster.</p>
 <div id="potential-issues-with-starsim" class="section level2">
 <h2>Potential issues with starsim</h2>
 <ol style="list-style-type: decimal">
@@ -373,6 +374,11 @@ home)</p></li>
 <li><p>and relatedly no way to have a 3-D contact matrix (so all-ages to
 all-ages in school home or work etc)</p></li>
 </ol>
+<p>Its also not the case that python is better for this task: <a href="https://www.reddit.com/r/datascience/comments/16dk5b6/r_vs_python_detailed_examples_from_proficient/" class="uri">https://www.reddit.com/r/datascience/comments/16dk5b6/r_vs_python_detailed_examples_from_proficient/</a>
+there are some benefits of the object oriented programming but also some
+features that we probably don’t need, and some overhead that also comes
+from working in a language where it may be hard to debug what is going
+on.</p>
 </div>
 <div id="and-so" class="section level2">
 <h2>And so</h2>
@@ -405,9 +411,11 @@ single parameter.</p>
 <p>So the way we will calibrate to the contact matrix is to have</p>
 <p>known:</p>
 <ul>
-<li>poisson mu for househould size</li>
-<li>poisson mu for school size</li>
-<li>poisson mu for work size</li>
+<li>poisson mu for househould size (basically, 1000 numbers since we
+know ACS)</li>
+<li>poisson mu for school size (again, known from ACS data)</li>
+<li>poisson mu for work size (and known from BLS etc data, 1000
+numbers)</li>
 </ul>
 <p>unknown:</p>
 <ul>
@@ -419,6 +427,8 @@ single parameter.</p>
 </ul>
 <p>need to figure out the correct units for p(exposure) but we have all
 the details we need</p>
+<p>We can do this in STAN pretty easily and just has to be done
+once.</p>
 <p>from this we’ll know how large each community should be, and these
 will be randomly assigned once</p>
 </div>

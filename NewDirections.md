@@ -5,7 +5,7 @@ Chad Milando
 
 Thoughts on the RSV modeling project. 
 TLDR is I think it makes sense to build the hybrid compartmental-agent based model
-that we talked about today, using R and Rcpp to make the computations faster.
+that we talked about today, using R and [Rcpp](https://cran.r-project.org/web/packages/Rcpp/vignettes/Rcpp-introduction.pdf) to make the computations faster.
 
 
 ## Potential issues with starsim
