@@ -80,11 +80,13 @@ once
 
 ## Calibration #2 
 
+we are then building a hybrid compartmental and agent-based model to solve the multiple people sick at the same time problem.
+
 what is the transmission probability? 
 
-the way we get this is the # of particl / kg - this becomes the target
+the way we get this is the # of particl / kg / time - this becomes the target
 
-essentially we'd be tuning to what is the # particles/kg that results in sickness
+essentially we'd be tuning to what is the # particles/kg/time that results in sickness
 and we have the prevalence #s
 
 each of the spacaces has a volume property
