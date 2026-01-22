@@ -101,22 +101,25 @@ but the sources becomes a function of the people there
 so the loop looks like
 
 ```
-for(space_i in all_spaces) {
+for(time in timesteps) {
 
- (1) what is the new source flux (how many sick people are in the room). 
-The sink is just a decay rate
-
- (2) use Runga-kutta to calculate end-of-timestep concentration
-
- (3) give people the average of the starting and ending concentration, i.e., each person
-"inhales" the room concentration at their own rate
-
- (4) enter the `person loop` to see what happens, but this is just updating the 
-      state properties and time-activity for each person
-
- (5) apply the time-activity action for each person. this is the last thing that
-      happens for each timestep
-
+  for(space_i in all_spaces) {
+  
+     (1) what is the new source flux (how many sick people are in the room). 
+    The sink is just a decay rate
+    
+     (2) use Runga-kutta to calculate end-of-timestep concentration
+    
+     (3) give people the average of the starting and ending concentration, i.e., each person
+    "inhales" the room concentration at their own rate
+    
+     (4) enter the `person loop` to see what happens, but this is just updating the 
+          state properties and time-activity for each person
+    
+     (5) apply the time-activity action for each person. this is the last thing that
+          happens for each timestep
+  
+  }
 }
 ```
 
