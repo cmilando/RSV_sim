@@ -54,13 +54,14 @@ Each of these are poisson distributions so you can model with a single parameter
 
 ## Calibration #1 - the contact matrix
 
-So the way we will calibrate to the contact matrix is to have
+For each *state*, the way we will calibrate to the contact matrix is to have:
 
 known:
 
 * poisson mu for househould size (basically, 1000 numbers since we know ACS)
 * poisson mu for school size (again, known from ACS data)
 * poisson mu for work size (and known from BLS etc data, 1000 numbers)
+* time-activity of how people spend time between each place
 
 unknown:
 
