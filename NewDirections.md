@@ -95,6 +95,8 @@ the virus has a decay rate in time
 
 ## the loop
 
+the timetep has to be sub-daily in order to get the fact that people are sub-daily
+
 so the loop becomes a differential equation in each space of the viral load
 but the sources becomes a function of the people there
 
