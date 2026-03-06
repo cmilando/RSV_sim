@@ -31,6 +31,15 @@
 #
 # from this we'll know how large each community should be, and these will be randomly assigned once
 
+
+#' ============================================================================
+
+Ways to make this faster
+* search among things that arent -1 so you pass in a smaller and smaller list
+* convert to a integer matrix
+
+
+
 #' ============================================================================
 #' ////////////////////////////////////////////////////////////////////////////
 #' CREATE DATA
@@ -49,7 +58,7 @@ dyn.load("rsv.so")
 
 # so N is the number of people represented
 # this just has to be large enough
-N <- 10e3
+N <- 10e6
 
 # knowns
 # adding 1 because these can never be 0
@@ -87,26 +96,15 @@ pop_df
 #' ////////////////////////////////////////////////////////////////////////////
 #' ============================================================================
 
-source("00_fcns.R")
+# source("00_fcns.R")
 
 pop_df <- reset_pop_df()
-og_pop_df <- pop_df
+# og_pop_df <- pop_df
 names_vec <- names(pop_df)
 
 # ***********************
 # HOUSEHOLD
 # household = 50% x (person < 25) and 50% x (person >= 25)
-pop_df <- og_pop_df
-pop_df <- set_ids(local_pop_df = pop_df,
-                  vec = household_sizes,
-                  column = "household_id",
-                  p1 = 0.5, p2 = 0.5,
-                  age0 = 0, age1 = 25, age2 = 125)
-pop_df
-subset(pop_df, age < 25 & is.na(household_id))
-
-pop_df <- og_pop_df
-
 oo <- .Fortran("set_ids",
                df = as.matrix(pop_df),
                nrows = as.integer(nrow(pop_df)),

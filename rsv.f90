@@ -56,6 +56,9 @@ subroutine set_ids(df, nrows, ncols,  age_col, vec, zero_col, &
     ii = 1
     xcontinue = 1
 
+    ! also start the df you are writing to
+    open (unit=20,file='df.txt',action="write", status="replace")
+
     ! =========================================================================
     ! /////////////////////////////////////////////////////////////////////////
     ! START THE LOOP
@@ -118,13 +121,23 @@ subroutine set_ids(df, nrows, ncols,  age_col, vec, zero_col, &
       ! xcontinue 2
       if(xcontinue .eq. 1) then
 
+        ! **** (1) ESSENTIALLY HERE I WANT TO EXPORT THE DF
+
         ! essentially its the ones that are -1
         do k = 1, nrows
           if (df(k, zero_col) .eq. -1.0) then
              df(k, zero_col) = float(ii)
+             write(20,*) df(k, :)
+             df(k, zero_col) = -1.0
           end if
         end do
 
+        ! **** (2) and reduce the size of df and nrows
+        ! so create a tmp, allocate it, delete df and then
+        ! rename it
+        ! and then
+
+        ! iterate
         ii = ii + 1
 
         ! define the stopping conditions
@@ -134,6 +147,7 @@ subroutine set_ids(df, nrows, ncols,  age_col, vec, zero_col, &
              not_all_assigned = 1
           end if
         end do
+
         if(not_all_assigned .eq. 0) then
           write(*,*) "all ids are complete - stopping"
           xcontinue = 0
@@ -161,6 +175,8 @@ subroutine set_ids(df, nrows, ncols,  age_col, vec, zero_col, &
     ! OUTPUT
     ! /////////////////////////////////////////////////////////////////////////
     ! =========================================================================
+    close(20)
+
     write(*,*) "Number of groups:", ii
     write(*,*) "Last group size:", vec(ii)
     do k = 1, nrows
