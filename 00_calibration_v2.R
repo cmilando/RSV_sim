@@ -34,9 +34,9 @@
 
 #' ============================================================================
 
-Ways to make this faster
-* search among things that arent -1 so you pass in a smaller and smaller list
-* convert to a integer matrix
+# Ways to make this faster
+# * search among things that arent -1 so you pass in a smaller and smaller list
+# * convert to a integer matrix
 
 
 
@@ -53,12 +53,12 @@ system("rm *.so")
 system("R CMD SHLIB rsv.f90")
 
 # load the library and create a tmp directory
-dyn.unload("rsv.so")
+# dyn.unload("rsv.so")
 dyn.load("rsv.so")
 
 # so N is the number of people represented
 # this just has to be large enough
-N <- 10e6
+N <- 1e5
 
 # knowns
 # adding 1 because these can never be 0
@@ -101,6 +101,7 @@ pop_df
 pop_df <- reset_pop_df()
 # og_pop_df <- pop_df
 names_vec <- names(pop_df)
+pop_df
 
 # ***********************
 # HOUSEHOLD
@@ -118,17 +119,15 @@ oo <- .Fortran("set_ids",
                age1 = 25,
                age2 = 125)
 
+##
 pop_df <- as.data.table(oo$df)
-names(pop_df) <- names_vec
+head(pop_df)
 subset( pop_df, age < 25 & household_id < 0)
 
-pop_df <- as.data.table(oo$df)
-pop_df
-rr <- which(pop_df[, 3] - -999.99 < 10^-4)
-rr
+##
+rr <- which(pop_df[, 3] < 0)
 pop_df[rr, 3] <- NA
-names(pop_df) <- names_vec
-pop_df
+subset( pop_df, age < 25 & is.na(household_id))
 
 # so the reason there are so many NAs is that there aren't any
 # people young enough to make any more houses
@@ -139,28 +138,53 @@ subset(pop_df, age > 25 & is.na(household_id))
 pop_df <- subset(pop_df, !is.na(household_id))
 pop_df
 
+
 # check the size distribution
 x1 <- pop_df[, .N, by = household_id]
 x1 <- table(x1$N)
 
 x0 <- table(household_sizes)
 
+source("00_fcns.R")
 plot_dists(x0, x1)
 
 
 # ***********************
 # SCHOOL
+# >> needs to be a single
 # school = 80% (person < 20) and 20% (person > = 20)
 # DOESN'T SEEM TO BE WORKING YET .... THERE SHOULD BE LIKE 10 schools
-pop_df <- set_ids(local_pop_df = pop_df,
-                  vec = school_sizes,
-                  column = "school_id",
-                  p1 = 0.8, p2 = 0.2,
-                  age0 = 0, age1 = 20, age2 = 125)
+# pop_df <- set_ids(local_pop_df = pop_df,
+#                   vec = school_sizes,
+#                   column = "school_id",
+#                   p1 = 0.8, p2 = 0.2,
+#                   age0 = 0, age1 = 20, age2 = 125)
+
+oo <- .Fortran("set_ids",
+               df = as.matrix(pop_df),
+               nrows = as.integer(nrow(pop_df)),
+               ncols = as.integer(ncol(pop_df)),
+               age_col = as.integer(2),
+               vec = as.integer(school_sizes),
+               zero_col = as.integer(5),
+               p1 = 0.8,
+               p2 = 0.2,
+               age0 = 0,
+               age1 = 20,
+               age2 = 125)
+
+##
+pop_df <- as.data.table(oo$df)
+head(pop_df)
+subset( pop_df, age > 25 & school_id < 0)
+
+rr <- which(pop_df[, 5] < 0)
+pop_df[rr, 5] <- NA
+subset( pop_df, age < 25 & is.na(household_id))
 
 # subset
 pop_df <- subset(pop_df, !is.na(school_id))
-pop_df
+nrow(pop_df)
 
 # check the size distribution
 x1 <- pop_df[, .N, by = school_id]
@@ -179,6 +203,19 @@ pop_df <- set_ids(local_pop_df = pop_df,
                   p1 = 0.01, p2 = 0.99,
                   age0 = 0, age1 = 20, age2 = 125)
 
+# oo <- .Fortran("set_ids",
+#                df = as.matrix(pop_df),
+#                nrows = as.integer(nrow(pop_df)),
+#                ncols = as.integer(ncol(pop_df)),
+#                age_col = as.integer(2),
+#                vec = as.integer(school_sizes),
+#                zero_col = as.integer(5),
+#                p1 = 0.01,
+#                p2 = 0.99,
+#                age0 = 0,
+#                age1 = 20,
+#                age2 = 125)
+
 # check the size distribution
 x1 <- pop_df[!is.na(pop_df$work_id), .N, by = work_id]
 x1 <- table(x1$N)
@@ -191,3 +228,6 @@ plot_dists(x0, x1)
 # ***********************
 # COMMUNITY
 # community = all people
+pop_df <- set_ids_single(local_pop_df = pop_df,
+                  vec = community_size_true,
+                  column = "community")

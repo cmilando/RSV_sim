@@ -57,7 +57,7 @@ subroutine set_ids(df, nrows, ncols,  age_col, vec, zero_col, &
     xcontinue = 1
 
     ! also start the df you are writing to
-    open (unit=20,file='df.txt',action="write", status="replace")
+    ! open (unit=20,file='df.txt',action="write", status="replace")
 
     ! =========================================================================
     ! /////////////////////////////////////////////////////////////////////////
@@ -127,8 +127,8 @@ subroutine set_ids(df, nrows, ncols,  age_col, vec, zero_col, &
         do k = 1, nrows
           if (df(k, zero_col) .eq. -1.0) then
              df(k, zero_col) = float(ii)
-             write(20,*) df(k, :)
-             df(k, zero_col) = -1.0
+             !write(20,*) df(k, :)
+             !df(k, zero_col) = -1.0
           end if
         end do
 

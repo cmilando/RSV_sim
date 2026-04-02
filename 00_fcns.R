@@ -187,6 +187,128 @@ set_ids <- function(local_pop_df, vec, column, p1, p2, age0, age1, age2) {
 }
 
 
+set_ids_single <- function(local_pop_df, vec, column, age0, age1) {
+
+  # **********
+  # local_pop_df = pop_df
+  # vec = household_sizes
+  # column = "household_id"
+  # p1 = 0.5; p2 = 0.5
+  # age0 = 0; age1 = 25; age2 = 125
+  # **********
+  local_pop_df = pop_df
+  vec = community_sizes
+  column = "community_id"
+  age0 = 0;  age1 = 125
+  # ************
+
+  continue = TRUE
+  ii = 1
+  cat("** Assigning", column, "**:\t")
+
+  while(continue) {
+
+    #
+    if(ii %% 1e3 == 0) cat(ii, '\t')
+
+    # this group size
+    total_grp_size = vec[ii]
+
+    # grps
+    grp1_size = floor(p1 * total_grp_size)
+    grp2_size = ceiling(p2 * total_grp_size)
+
+    if(!(grp1_size + grp2_size == total_grp_size)) {
+      print(grp1_size)
+      print(grp2_size)
+      print(total_grp_size)
+      stop("error in split math")
+    }
+
+    # get IDs for group 1
+    if(grp1_size > 0) {
+      out1 <- get_ids(local_pop_df, grp1_size, column,
+                      age_lower = age0, age_higher = age1 - 1)
+
+      local_continue <- out1$continue
+      n1 <- out1$n
+      grp1_ids     <- out1$ids
+      local_pop_df <- out1$local_pop_df
+    } else {
+      local_continue = TRUE
+      n1 <- 0
+      grp1_ids     <- c()
+      local_pop_df <- local_pop_df
+    }
+
+    # get IDs for group 2
+    if(local_continue) {
+
+      out2 <- get_ids(local_pop_df, grp2_size, column,
+                      age_lower = age1, age_higher = age2)
+
+      local_continue2 <- out2$continue
+      n2 <- out2$n
+
+      if(local_continue2) {
+
+        grp2_ids     <- out2$ids
+        local_pop_df <- out2$local_pop_df
+
+        # get all ids
+        all_ids <- c(grp1_ids, grp2_ids)
+        if(any(is.na(all_ids))) {
+          print(all_ids)
+          stop('something in all_ids is NA')
+        }
+
+        # set
+        rr <- which(local_pop_df$person_id %in% all_ids)
+        local_pop_df[rr, column] = ii
+        if(any(is.na(local_pop_df[rr, get(column)]))) {
+          stop("some error in reset math 1")
+        }
+
+        if(!(all(local_pop_df[rr, get(column)] >= 0))) {
+
+          rr2 <- which(local_pop_df[rr, get(column)] < 0)
+          print(local_pop_df[rr2, ])
+
+          stop("some error in reset math 2")
+        }
+
+        ii = ii + 1
+
+        # define the stopping conditions
+        if(all(local_pop_df[, get(column)] > 0)) {
+          cat("all ids are complete - stopping\n")
+          continue = FALSE
+        }
+
+      } else {
+        cat("out2 continue is FALSE -", total_grp_size, n1, n2,"- \n")
+        continue = FALSE
+      }
+
+    } else {
+      cat("out1 continue is FALSE -",n1,"- \n")
+      continue = FALSE
+    }
+  }
+
+  # set to NA any that are missing
+  # this includes any that were 0 and got halfway through
+  cat("Number of groups:", ii, "\n")
+  cat("Last group size:", vec[ii], "\n")
+  # print(head(local_pop_df))
+  rr <- which(local_pop_df[, get(column)] <= 0)
+  local_pop_df[rr, column] = NA
+
+  return(local_pop_df)
+}
+
+
+
 plot_dists <- function(x0, x1)  {
 
   library(ggplot2)
