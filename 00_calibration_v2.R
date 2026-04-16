@@ -37,6 +37,8 @@
 # Ways to make this faster
 # * search among things that arent -1 so you pass in a smaller and smaller list
 # * convert to a integer matrix
+# * I suppose you could make this faster by randomly sampling and generating it
+#   forwards rather than subsetting?
 
 
 
@@ -58,7 +60,7 @@ dyn.load("rsv.so")
 
 # so N is the number of people represented
 # this just has to be large enough
-N <- 1e5
+N <- 5e5
 
 # knowns
 # adding 1 because these can never be 0
