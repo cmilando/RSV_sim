@@ -6,6 +6,10 @@ pop_df <- readRDS("demo_pop.RDS")
 head(pop_df)
 dim(pop_df)
 
+# first do some cleaning that there should not be more than 2 missings in any row
+n_miss <- apply(pop_df, 1, \(x) length(which(is.na(x))))
+rr <- which(n_miss > 1)
+pop_df <- pop_df[n_miss == 1, ]
 
 # ok so now you need to
 # write some STAN code
@@ -81,7 +85,7 @@ get_oo <- function(i) {
 
   xgrid
   }, error = function(msg){
-    stop(paste0("ERROR AT", i))
+    stop(paste0("ERROR AT ", i))
   })
   return(fxgrid)
 
@@ -111,3 +115,4 @@ x_l <- my_fcn(1:10)
 x_l <- my_fcn(1:nrow(pop_df))
 x_l[[1]]
 
+pop_df[176785, ]
