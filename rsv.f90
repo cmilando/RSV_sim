@@ -188,6 +188,153 @@ subroutine set_ids(df, nrows, ncols,  age_col, vec, zero_col, &
 end subroutine set_ids
 
 !--------------------------------------------------------------------------
+! Subroutine for set_ids
+!--------------------------------------------------------------------------
+subroutine set_ids_single(df, nrows, ncols,  age_col, vec, zero_col, &
+                    & age0, age1)
+
+    !# **********
+    !# local_pop_df = pop_df
+    !# vec = household_sizes
+    !# column = "household_id"
+    !# p1 = 0.5; p2 = 0.5
+    !# age0 = 0; age1 = 25; age2 = 125
+    !***********************
+
+    implicit none
+
+
+    ! =========================================================================
+    ! /////////////////////////////////////////////////////////////////////////
+    ! VARIABLE DEFINTIONS
+    ! /////////////////////////////////////////////////////////////////////////
+    ! =========================================================================
+
+    integer, intent(in)       :: nrows     ! the number of rows of df
+    integer, intent(in)       :: ncols     ! the number of columns of df
+    integer, intent(in)       :: age_col   ! which columns is the age_column
+    integer, intent(in)       :: zero_col  ! which column is currently being sorted on
+    real(kind=8)              :: df(nrows, ncols) ! a real matrix
+    integer, intent(in)       :: vec(nrows) ! a vector of group sizes
+    real(kind=8), intent(in)  :: age0, age1 ! age group cutoffs
+
+    ! helpers
+    integer                   :: xcontinue, not_all_assigned
+    integer                   :: ii, k
+    integer                   :: total_grp_size, grp1_size
+
+    ! blanks to pass to get_ids
+    integer                   :: rr(nrows)  ! which rows to be selected
+    real(kind=8)              :: ids(nrows) ! an array of ids, passed in a reset to 0
+    integer                   :: ids_size   ! how many to count forward in ids
+    integer                   :: n1     ! how many in each group
+
+    ! initialize
+    ii = 1
+    xcontinue = 1
+
+    ! also start the df you are writing to
+    ! open (unit=20,file='df.txt',action="write", status="replace")
+
+    ! =========================================================================
+    ! /////////////////////////////////////////////////////////////////////////
+    ! START THE LOOP
+    ! since its a while continue, just use line number statements
+    ! /////////////////////////////////////////////////////////////////////////
+    ! =========================================================================
+
+40  if(mod(ii, 1000) .eq. 0) then
+      write(*,*) ii
+    end if
+
+    ! set this group size
+    total_grp_size = vec(ii)
+
+    ! get group sizes
+    grp1_size = total_grp_size
+
+    ! initialize
+    ! need to define rr, ids, and ids_size
+    rr(:)     = 0
+    ids_size  = 0
+    ids(:)    = 0
+    n1        = INT(0)
+    xcontinue = 1
+
+    ! get ids for group 1
+    call get_ids(df, nrows, ncols, age_col, age0, age1, zero_col, rr, &
+               & grp1_size, xcontinue, ids, ids_size)
+
+    n1 = ids_size
+
+    ! now continue for the 2nd group
+    ! initialize again
+    rr(:)     = 0
+    ids_size  = 0
+    ids(:)    = 0
+
+    ! xcontinue 1
+    if(xcontinue .eq. 1) then
+
+        ! essentially its the ones that are -1
+        do k = 1, nrows
+          if (df(k, zero_col) .eq. -1.0) then
+             df(k, zero_col) = float(ii)
+             !write(20,*) df(k, :)
+             !df(k, zero_col) = -1.0
+          end if
+        end do
+
+        ! **** (2) and reduce the size of df and nrows
+        ! so create a tmp, allocate it, delete df and then
+        ! rename it
+        ! and then
+
+        ! iterate
+        ii = ii + 1
+
+        ! define the stopping conditions
+        not_all_assigned = 0
+        do k = 1, nrows
+          if (df(k, zero_col) .le. 0.0) then
+             not_all_assigned = 1
+          end if
+        end do
+
+        if(not_all_assigned .eq. 0) then
+          write(*,*) "all ids are complete - stopping"
+          xcontinue = 0
+        end if
+
+    else
+
+      write(*,*) "out1 continue is FALSE -",n1
+      xcontinue = 0
+
+    end if ! 1
+
+    if (xcontinue .eq. 1) goto 40
+
+
+    ! =========================================================================
+    ! /////////////////////////////////////////////////////////////////////////
+    ! OUTPUT
+    ! /////////////////////////////////////////////////////////////////////////
+    ! =========================================================================
+    close(20)
+
+    write(*,*) "Number of groups:", ii
+    write(*,*) "Last group size:", vec(ii)
+    do k = 1, nrows
+      if (df(k, zero_col) .le. 0.0) then
+         df(k, zero_col) = -999.99
+      end if
+    end do
+
+end subroutine set_ids_single
+
+
+!--------------------------------------------------------------------------
 ! Subroutine for get_ids
 !--------------------------------------------------------------------------
 subroutine get_ids(df, nrows, ncols, age_col, age_lb, age_ub, zero_col, rr, &

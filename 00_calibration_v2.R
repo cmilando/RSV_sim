@@ -160,35 +160,24 @@ plot_dists(x0, x1)
 #                   p1 = 0.8, p2 = 0.2,
 #                   age0 = 0, age1 = 20, age2 = 125)
 
-oo <- .Fortran("set_ids",
+oo <- .Fortran("set_ids_single",
                df = as.matrix(pop_df),
                nrows = as.integer(nrow(pop_df)),
                ncols = as.integer(ncol(pop_df)),
                age_col = as.integer(2),
                vec = as.integer(school_sizes),
                zero_col = as.integer(5),
-               p1 = 0.8,
-               p2 = 0.2,
                age0 = 0,
-               age1 = 20,
-               age2 = 125)
+               age1 = 20)
 
 ##
 pop_df <- as.data.table(oo$df)
 head(pop_df)
-subset( pop_df, age > 25 & school_id < 0)
-
-rr <- which(pop_df[, 5] < 0)
-pop_df[rr, 5] <- NA
-subset( pop_df, age < 25 & is.na(household_id))
-
-# subset
-pop_df <- subset(pop_df, !is.na(school_id))
-nrow(pop_df)
 
 # check the size distribution
-x1 <- pop_df[, .N, by = school_id]
+x1 <- pop_df[pop_df$age < 20, .N, by = school_id]
 x1 <- table(x1$N)
+x1
 
 x0 <- table(school_sizes)
 
@@ -197,27 +186,23 @@ plot_dists(x0, x1)
 # ***********************
 # WORK
 # work = 100% (person > 20)
-pop_df <- set_ids(local_pop_df = pop_df,
-                  vec = work_sizes,
-                  column = "work_id",
-                  p1 = 0.01, p2 = 0.99,
-                  age0 = 0, age1 = 20, age2 = 125)
+# tmp reset NA to -999
+oo <- .Fortran("set_ids_single",
+               df = as.matrix(pop_df),
+               nrows = as.integer(nrow(pop_df)),
+               ncols = as.integer(ncol(pop_df)),
+               age_col = as.integer(2),
+               vec = as.integer(work_sizes),
+               zero_col = as.integer(4),
+               age0 = 20,
+               age1 = 125)
 
-# oo <- .Fortran("set_ids",
-#                df = as.matrix(pop_df),
-#                nrows = as.integer(nrow(pop_df)),
-#                ncols = as.integer(ncol(pop_df)),
-#                age_col = as.integer(2),
-#                vec = as.integer(school_sizes),
-#                zero_col = as.integer(5),
-#                p1 = 0.01,
-#                p2 = 0.99,
-#                age0 = 0,
-#                age1 = 20,
-#                age2 = 125)
+##
+pop_df <- as.data.table(oo$df)
+head(pop_df)
 
 # check the size distribution
-x1 <- pop_df[!is.na(pop_df$work_id), .N, by = work_id]
+x1 <- pop_df[pop_df$age >= 20, .N, by = work_id]
 x1 <- table(x1$N)
 
 x0 <- table(work_sizes)
@@ -230,13 +215,39 @@ plot_dists(x0, x1)
 # community = all people
 df_backup <- pop_df
 
-pop_df <- set_ids_single(local_pop_df = pop_df,
-                  vec = community_size_true,
-                  column = "community_id",
-                  age0 = 0, age1 = 125)
+oo <- .Fortran("set_ids_single",
+               df = as.matrix(pop_df),
+               nrows = as.integer(nrow(pop_df)),
+               ncols = as.integer(ncol(pop_df)),
+               age_col = as.integer(2),
+               vec = as.integer(community_size_true),
+               zero_col = as.integer(6),
+               age0 = 0,
+               age1 = 125)
 
+pop_df <- as.data.table(oo$df)
 head(pop_df)
 
 summary(pop_df$community_id)
 
+# ***********************
+# set NAs
+for(j in 3:6) {
+  rr <- which(pop_df[, ..j] < 0)
+  if(length(rr) > 0) pop_df[rr, j] <- NA
+}
+head(pop_df)
 
+# ***********************
+plot_dist <- function(str_id, vec) {
+  x1 <- pop_df[!is.na(get(str_id)), .N, by = str_id]
+  x1 <- table(x1$N)
+  x0 <- table(vec)
+  plot_dists(x0, x1)
+}
+plot_dist("community_id", community_size_true)
+plot_dist("work_id", work_sizes)
+plot_dist("household_id", household_sizes)
+plot_dist("school_id", school_sizes)
+
+saveRDS(pop_df, "demo_pop.RDS")
