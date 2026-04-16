@@ -113,6 +113,27 @@ my_fcn <- function(p_all) {
 # takes a few minutes but not terrible
 x_l <- my_fcn(1:10)
 x_l <- my_fcn(1:nrow(pop_df))
-x_l[[1]]
 
-pop_df[176785, ]
+saveRDS(x_l, "x_l.RDS")
+
+x_df <- do.call(rbind, x_l)
+
+head(x_df)
+
+group_cols = c(
+  'age', 'ref_age'
+)
+
+
+
+x_df_agg <- x_df[, .(
+  sum_pt_sum = sum(pt_sum)), by = group_cols
+]
+
+summary(x_df_agg$sum_pt_sum)
+
+head(x_df_agg)
+library(ggplot2)
+ggplot(x_df_agg) +
+  geom_tile(aes(x = age, y = ref_age, fill = log(sum_pt_sum))) +
+  scale_fill_viridis_c()

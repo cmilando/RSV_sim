@@ -2,3 +2,4 @@
 *.o
 .Rproj.user
 .ipynb_*
+*.RDS
