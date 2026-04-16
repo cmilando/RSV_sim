@@ -228,6 +228,15 @@ plot_dists(x0, x1)
 # ***********************
 # COMMUNITY
 # community = all people
+df_backup <- pop_df
+
 pop_df <- set_ids_single(local_pop_df = pop_df,
                   vec = community_size_true,
-                  column = "community")
+                  column = "community_id",
+                  age0 = 0, age1 = 125)
+
+head(pop_df)
+
+summary(pop_df$community_id)
+
+
