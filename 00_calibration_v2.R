@@ -48,6 +48,7 @@
 #' ////////////////////////////////////////////////////////////////////////////
 #' ============================================================================
 library(data.table)
+source("00_fcns.R")
 set.seed(123)
 
 system("rm *.o")
@@ -60,7 +61,7 @@ dyn.load("rsv.so")
 
 # so N is the number of people represented
 # this just has to be large enough
-N <- 5e5
+N <- 1e5
 
 # knowns
 # adding 1 because these can never be 0
@@ -147,8 +148,7 @@ x1 <- table(x1$N)
 
 x0 <- table(household_sizes)
 
-source("00_fcns.R")
-plot_dists(x0, x1)
+plot_dists(x0, x1, 'household')
 
 
 # ***********************
@@ -183,12 +183,13 @@ x1
 
 x0 <- table(school_sizes)
 
-plot_dists(x0, x1)
+plot_dists(x0, x1, 'school')
 
 # ***********************
 # WORK
 # work = 100% (person > 20)
 # tmp reset NA to -999
+# >> Set the upper bound to be
 oo <- .Fortran("set_ids_single",
                df = as.matrix(pop_df),
                nrows = as.integer(nrow(pop_df)),
@@ -209,7 +210,7 @@ x1 <- table(x1$N)
 
 x0 <- table(work_sizes)
 
-plot_dists(x0, x1)
+plot_dists(x0, x1, 'work')
 
 
 # ***********************
@@ -245,11 +246,14 @@ plot_dist <- function(str_id, vec) {
   x1 <- pop_df[!is.na(get(str_id)), .N, by = str_id]
   x1 <- table(x1$N)
   x0 <- table(vec)
-  plot_dists(x0, x1)
+  plot_dists(x0, x1, str_id)
 }
-plot_dist("community_id", community_size_true)
-plot_dist("work_id", work_sizes)
-plot_dist("household_id", household_sizes)
-plot_dist("school_id", school_sizes)
+p1 <- plot_dist("household_id", household_sizes)
+p2 <- plot_dist("school_id", school_sizes)
+p3 <- plot_dist("work_id", work_sizes)
+p4 <- plot_dist("community_id", community_size_true)
+
+library(patchwork)
+p1 + p2 + p3 + p4 + plot_layout(guides = 'collect', axes = 'collect')
 
 saveRDS(pop_df, "demo_pop.RDS")

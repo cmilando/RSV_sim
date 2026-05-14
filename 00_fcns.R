@@ -253,7 +253,7 @@ set_ids_single <- function(local_pop_df, vec, column, age0, age1) {
 
 
 
-plot_dists <- function(x0, x1)  {
+plot_dists <- function(x0, x1, str_main)  {
 
   library(ggplot2)
 
@@ -276,5 +276,6 @@ plot_dists <- function(x0, x1)  {
 
   ggplot(df, aes(x = size, y = prop, fill = group)) +
     geom_col(position = "dodge") +
-    theme_minimal()
+    theme_minimal() +
+    ggtitle(str_main)
 }
