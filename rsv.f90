@@ -247,6 +247,8 @@ subroutine set_ids_single(df, nrows, ncols,  age_col, vec, zero_col, &
       write(*,*) ii
     end if
 
+    write(*,*) ii
+
     ! set this group size
     total_grp_size = vec(ii)
 
@@ -264,6 +266,8 @@ subroutine set_ids_single(df, nrows, ncols,  age_col, vec, zero_col, &
     ! get ids for group 1
     call get_ids(df, nrows, ncols, age_col, age0, age1, zero_col, rr, &
                & grp1_size, xcontinue, ids, ids_size)
+
+    write(*,*) ids
 
     n1 = ids_size
 
@@ -419,7 +423,7 @@ subroutine get_ids(df, nrows, ncols, age_col, age_lb, age_ub, zero_col, rr, &
     ! *****************
     ! now check if you've reached the end
     ! probably because there are no more people in this age bracket
-    if (n >= sum(rr)) then
+    if (n > sum(rr)) then
     ! *****************
 
       ! set a temporary placeholder in zero_col that you will deal with later
@@ -550,9 +554,12 @@ subroutine fsubset(df, nrows, ncols, age_col, age_lb, age_ub, zero_col, rr)
     integer :: rr(nrows)
 
     ! Initialize
+    ! it has to return an integer
     rr(:) = INT(0)
 
     ! iterate
+    ! GREATER THAN OR EQUAL TO LOWER BOUND but
+    ! JUST LESS THAN UPPER BOUND
     do i = 1, nrows
       if(df(i, age_col) .ge. age_lb .and. df(i, age_col) .lt. age_ub &
       & .and. df(i, zero_col) == 0) then

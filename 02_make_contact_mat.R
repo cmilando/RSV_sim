@@ -6,11 +6,18 @@ pop_df <- readRDS("demo_pop.RDS")
 head(pop_df)
 dim(pop_df)
 
+#
+table(pop_df$household_id)
+table(pop_df$work_id)
+table(pop_df$school_id)
+table(pop_df$community_id) # hmm everyone needs a community ID
+
 # first do some cleaning that there should not be more than 2 missings in any row
-n_miss <- apply(pop_df, 1, \(x) length(which(is.na(x))))
-rr <- which(n_miss > 1)
-rr
-pop_df <- pop_df[n_miss == 1, ]
+# actually no because some people might not have work or school and thats ok
+# n_miss <- apply(pop_df, 1, \(x) length(which(is.na(x))))
+# rr <- which(n_miss > 2)
+# rr
+# pop_df <- pop_df[n_miss == 1, ]
 
 # ok so now you need to
 # write some STAN code
@@ -28,11 +35,11 @@ pop_df <- pop_df[n_miss == 1, ]
 
 i = 1
 
-GET_COMMUNITY <- T
+
 
 oo <- vector("list", nrow(pop_df))
 
-get_oo <- function(i) {
+get_oo <- function(i, GET_COMMUNITY) {
 
   fxgrid <- tryCatch({
 
@@ -87,24 +94,31 @@ get_oo <- function(i) {
   if(!is.na(w_id))  x4 <- table(work_members$age)
 
   make_df <- function(xx) {
-    y <- as.data.table(xx)
-    names(y) = c('age', deparse(substitute(xx)))
-    y$age <- as.numeric(y$age)
-    y
+    if(length(xx) > 1) {
+      y <- as.data.table(xx)
+      names(y) = c('age', deparse(substitute(xx)))
+      y$age <- as.numeric(y$age)
+      return(y)
+    } else {
+      y <- data.table(age = as.numeric(0:100), v = 0)
+      y$v <- as.numeric(y$v)
+      names(y) = c('age', deparse(substitute(xx)))
+      return(y)
+    }
   }
 
   # this should have the same upper limit as your other script
-  xgrid <- as.data.table(tidyr::expand_grid(age = as.numeric(0:100)))
+  xgrid <- data.table(age = as.numeric(0:100))
 
-  if(!is.na(hh_id)) x1 <- make_df(x1)
-  if(!is.na(c_id))  x2 <- make_df(x2)
-  if(!is.na(s_id))  x3 <- make_df(x3)
-  if(!is.na(w_id))  x4 <- make_df(x4)
+  x1 <- make_df(x1)
+  x2 <- make_df(x2)
+  x3 <- make_df(x3)
+  x4 <- make_df(x4)
 
-  if(!is.na(hh_id)) xgrid <- x1[xgrid, on = 'age']
-  if(!is.na(c_id))  xgrid <- x2[xgrid, on = 'age']
-  if(!is.na(s_id))  xgrid <- x3[xgrid, on = 'age']
-  if(!is.na(w_id))  xgrid <- x4[xgrid, on = 'age']
+  xgrid <- x1[xgrid, on = 'age']
+  xgrid <- x2[xgrid, on = 'age']
+  xgrid <- x3[xgrid, on = 'age']
+  xgrid <- x4[xgrid, on = 'age']
 
   for(j in 2:ncol(xgrid)) {
     rr <- which(is.na(xgrid[, ..j]))
@@ -117,11 +131,17 @@ get_oo <- function(i) {
   xgrid$pt_sum <- apply(xgrid[,2:ncol(xgrid)], 1, sum)
 
   xgrid$ref_age <- person_i$age
-  xgrid$ref_id <- person_i$person_id
+  xgrid$ref_id  <- person_i$person_id
 
-  xgrid$contact_age <- xgrid$age
+  setnames(xgrid, 'age', 'contact_age')
+  setnames(xgrid, 'x1', 'household')
+  setnames(xgrid, 'x2', 'community')
+  setnames(xgrid, 'x3', 'school')
+  setnames(xgrid, 'x4', 'work')
 
-  xgrid <- xgrid[, .(ref_id, ref_age, contact_age, pt_sum)]
+  # commenting this out so can trace the sum
+  # xgrid <- xgrid[, .(ref_id, ref_age, contact_age, pt_sum)]
+
 
   # subset to just non-empty rows
   # xgrid <- subset(xgrid, pt_sum > 0)
@@ -146,21 +166,27 @@ set.seed(1)
 handlers(global = TRUE)
 handlers("progress")
 
-my_fcn <- function(p_all) {
+my_fcn <- function(p_all, GET_COMMUNITY) {
   p <- progressor(along = p_all)
   xx <- future_lapply(p_all, function(x) {
     p(sprintf("x=%s", x))
-    get_oo(x)
+    get_oo(x, GET_COMMUNITY)
   })
   return(xx)
 }
 
 # takes a few minutes but not terrible3
-x_l <- my_fcn(1:10)
+x_l <- my_fcn(1:10, GET_COMMUNITY = T)
 
 # #333
-x_l <- my_fcn(1:nrow(pop_df))
+x_l <- my_fcn(1:nrow(pop_df), GET_COMMUNITY = T)
 
 # save
-saveRDS(x_l, paste0("x_l_", GET_COMMUNITY, ".RDS"))
+saveRDS(x_l, paste0("x_l_", TRUE, ".RDS"))
+
+# #333
+x_l <- my_fcn(1:nrow(pop_df), GET_COMMUNITY = F)
+
+# save
+saveRDS(x_l, paste0("x_l_", FALSE, ".RDS"))
 

@@ -61,13 +61,22 @@ dyn.load("rsv.so")
 
 # so N is the number of people represented
 # this just has to be large enough
-N <- 1e5
+
+# the smallest number you can start with seems to be
+# 300
+N <- 1000
 
 # knowns
 # adding 1 because these can never be 0
 household_sizes <- rpois(N, 3) + 1  # comes from ACS
 work_sizes      <- rpois(N, 20) + 1   # comes from BLS
 school_sizes    <- rpois(N, 50) + 1  # comes from somewhere
+
+household_sizes <- rep(4, N )
+
+work_sizes <- rep(5, N )
+
+school_sizes <- rep(5, N )
 
 summary(household_sizes)
 
@@ -76,10 +85,18 @@ summary(household_sizes)
 # we'll solve for this next
 community_size_true <- rpois(N, 50)
 
+community_size_true <- rep(15, N )
+community_size_true
+
 # contact matrix
 # ok so first you need an age distribution
 # lets just assume its uniform
-age_dist <- runif(N, min = 0, max = 100)
+age_dist <- round(runif(N, min = 0, max = 100))
+age_dist <- c(rep(15, N/2), rep(30, N/2))
+hist(age_dist)
+age_dist_df <- data.frame(table(age_dist))
+names(age_dist_df)
+saveRDS(age_dist, 'age_dist.RDS')
 
 # now create your population dataset
 reset_pop_df <- function() {
@@ -125,30 +142,52 @@ oo <- .Fortran("set_ids",
 ##
 pop_df <- as.data.table(oo$df)
 head(pop_df)
-subset( pop_df, age < 25 & household_id < 0)
 
-##
-rr <- which(pop_df[, 3] < 0)
-pop_df[rr, 3] <- NA
-subset( pop_df, age < 25 & is.na(household_id))
+# right so make everyone else either part of a 2 or a 1
+# subset( pop_df, age > 25 & household_id < 0)
 
-# so the reason there are so many NAs is that there aren't any
-# people young enough to make any more houses
-# hm this doesn't seem to be true
-subset(pop_df, age > 25 & is.na(household_id))
+# wait is this a faster way to do this
+# get everyone who is left
+# randomize the order
+# then just go down the line assigning groups
+# its just one randomize then a list
+# that has to be way faster
+rr <- which(pop_df$household_id < 0)
+rr
+if(length(rr) > 0) {
+  length(rr) %% 3 # ok so this means it ends with a 2
+  n_grps <- c(rep(c(2, 1), floor(length(rr) / 3)), length(rr) %% 3)
+  stopifnot(sum(n_grps) == length(rr))
 
-# subset
-pop_df <- subset(pop_df, !is.na(household_id))
-pop_df
+  # now randomize
+  rand_rows <- sample(rr, length(rr))
 
+  # and go down the line
+  hh_id <- max(pop_df$household_id) + 1
+  rr_i = 1
+  for(i in 1:length(n_grps)) {
+    this_grp_size <- n_grps[i]
+    these_rows <- rand_rows[rr_i:(rr_i + this_grp_size - 1)]
+    pop_df$household_id[these_rows] <- hh_id
+    # update counters
+    hh_id = hh_id + 1
+    rr_i = rr_i + this_grp_size
+  }
+  pop_df
+}
+
+# and its probably even faster to do in the big group too
+# just split them into two lists and go down each group
+# you know it might still be faster this way
+# but i think doing both seems fair
 
 # check the size distribution
-x1 <- pop_df[, .N, by = household_id]
-x1 <- table(x1$N)
-
-x0 <- table(household_sizes)
-
-plot_dists(x0, x1, 'household')
+# x1 <- pop_df[, .N, by = household_id]
+# x1 <- table(x1$N)
+#
+# x0 <- table(household_sizes)
+#
+# plot_dists(x0, x1, 'household')
 
 
 # ***********************
@@ -175,15 +214,24 @@ oo <- .Fortran("set_ids_single",
 ##
 pop_df <- as.data.table(oo$df)
 head(pop_df)
+table(pop_df$school_id)
 
-# check the size distribution
-x1 <- pop_df[pop_df$age < 20, .N, by = school_id]
-x1 <- table(x1$N)
-x1
+#
+# # set <0 to NA
+# rr <- which(pop_df$school_id < 0 & pop_df$age < 20)
+# length(rr)
+#
+# # check the size distribution
+# x1 <- pop_df[pop_df$age <= 20, .N, by = school_id]
+# x1 <- table(x1$N)
+# x1å
+#
+# x0 <- table(school_sizes)
+#
+# plot_dists(x0, x1, 'school')
 
-x0 <- table(school_sizes)
-
-plot_dists(x0, x1, 'school')
+# pop_df$school_id[1:5] = 1
+# pop_df$school_id[6:10] = 2
 
 # ***********************
 # WORK
@@ -198,26 +246,34 @@ oo <- .Fortran("set_ids_single",
                vec = as.integer(work_sizes),
                zero_col = as.integer(4),
                age0 = 20,
-               age1 = 125)
+               age1 = 100)
 
 ##
 pop_df <- as.data.table(oo$df)
 head(pop_df)
+table(pop_df$work_id)
 
-# check the size distribution
-x1 <- pop_df[pop_df$age >= 20, .N, by = work_id]
-x1 <- table(x1$N)
+#
+# # check the size distribution
+# x1 <- pop_df[pop_df$age >= 20, .N, by = work_id]
+# x1 <- table(x1$N)
+#
+# x0 <- table(work_sizes)
+#
+# plot_dists(x0, x1, 'work')
 
-x0 <- table(work_sizes)
 
-plot_dists(x0, x1, 'work')
+# pop_df$work_id[11:13] = 1
+# pop_df$work_id[14:17] = 2
+# pop_df$work_id[18:20] = 3
 
+# ***********************
+# Get rid of anyone that doesn't have school or work?
+# what about people > 65?
 
 # ***********************
 # COMMUNITY
 # community = all people
-df_backup <- pop_df
-
 oo <- .Fortran("set_ids_single",
                df = as.matrix(pop_df),
                nrows = as.integer(nrow(pop_df)),
@@ -226,34 +282,56 @@ oo <- .Fortran("set_ids_single",
                vec = as.integer(community_size_true),
                zero_col = as.integer(6),
                age0 = 0,
-               age1 = 125)
+               age1 = 100)
 
 pop_df <- as.data.table(oo$df)
 head(pop_df)
+#
+# # add the extra community
+rr <- which(pop_df$community_id < 0)
+rr
+if(length(rr) > 0) {
+  max_cid <- max(pop_df$community_id, na.rm = T)
+  pop_df$community_id[rr] <- max_cid + 1
+  head(pop_df)
+}
+#
+# # subset
+# # everyone needs a community
+# summary(pop_df$community_id)
 
-summary(pop_df$community_id)
+# rr <- sample(1:20, 10)
+#
+# pop_df$community_id[1:20 %in% rr] = 1
+# pop_df$community_id[!(1:20 %in% rr)] = 2
 
 # ***********************
 # set NAs
-for(j in 3:6) {
-  rr <- which(pop_df[, ..j] < 0)
-  if(length(rr) > 0) pop_df[rr, j] <- NA
-}
-head(pop_df)
+# for(j in 3:6) {
+#   rr <- which(pop_df[, ..j] < 0)
+#   if(length(rr) > 0) pop_df[rr, j] <- NA
+# }
+# head(pop_df)
 
 # ***********************
-plot_dist <- function(str_id, vec) {
-  x1 <- pop_df[!is.na(get(str_id)), .N, by = str_id]
-  x1 <- table(x1$N)
-  x0 <- table(vec)
-  plot_dists(x0, x1, str_id)
-}
-p1 <- plot_dist("household_id", household_sizes)
-p2 <- plot_dist("school_id", school_sizes)
-p3 <- plot_dist("work_id", work_sizes)
-p4 <- plot_dist("community_id", community_size_true)
+# plot_dist <- function(str_id, vec) {
+#   x1 <- pop_df[!is.na(get(str_id)), .N, by = str_id]
+#   x1 <- table(x1$N)
+#   x0 <- table(vec)
+#   plot_dists(x0, x1, str_id)
+# }
+# p1 <- plot_dist("household_id", household_sizes)
+# p2 <- plot_dist("school_id", school_sizes)
+# p3 <- plot_dist("work_id", work_sizes)
+# p4 <- plot_dist("community_id", community_size_true)
 
-library(patchwork)
-p1 + p2 + p3 + p4 + plot_layout(guides = 'collect', axes = 'collect')
+# library(patchwork)
+# p1 + p2 + p3 + p4 + plot_layout(guides = 'collect', axes = 'collect')
+
+rr <- which(pop_df$work_id < 0)
+pop_df$work_id[rr] <- NA
+
+rr <- which(pop_df$school_id < 0)
+pop_df$school_id[rr] <- NA
 
 saveRDS(pop_df, "demo_pop.RDS")
