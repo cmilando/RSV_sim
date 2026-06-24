@@ -160,177 +160,177 @@ ggplot(total_contact_no_comm) +
 # this isn't exactly correct because
 
 #' ============================================================================
-library(data.table)
-library(ggplot2)
-library(future)
-library(future.apply)
-library(progressr)
-
-# setup for parallel processing
-plan(multisession, workers = 4)
-nbrOfWorkers()
-set.seed(1)
-handlers(global = TRUE)
-handlers("progress")
-
-age_dist <- readRDS("age_dist.RDS")
-N_pop <- length(age_dist)
-age_dist
-
-get_mat_by_lambda <- function(lambda_guess) {
-
-  # ********************
-  # lambda_guess = 10
-  # ********************
-
-  comm_vect <-  rep(lambda_guess, N_pop / lambda_guess)
-
-  if(N_pop %% lambda_guess > 0) {
-    comm_vect = c(comm_vect, N_pop %% lambda_guess)
-  }
-
-  comm_vect
-  rand_rows <- sample(1:N_pop, N_pop)
-  rand_rows
-
-  comm_id <-  1
-  rr_i = 1
-  comm_id_mat <- matrix(nrow = N_pop, ncol = 1)
-  mat_i = 1
-
-  for(i in 1:length(comm_vect)) {
-    this_grp_size <- comm_vect[i]
-    these_rows <- rand_rows[rr_i:(rr_i + this_grp_size - 1)]
-    comm_id_mat[these_rows, mat_i] <- comm_id
-    # update counters
-    comm_id = comm_id + 1
-    rr_i = rr_i + this_grp_size
-  }
-
-  comm_id_mat
-
-  age_dist
-
-  simple_pop_df <- data.table(
-    person_id = 1:N_pop,
-    age = age_dist,
-    community_id = comm_id_mat[, 1]
-  )
-
-  get_simple_oo <- function(i) {
-
-    fxgrid <- tryCatch({
-
-    # FOR EACH I
-    person_i <- simple_pop_df[i, ]
-
-    c_id <-  person_i$community_id
-
-    community_members <- subset(simple_pop_df, community_id == c_id &
-                                  person_id != person_i$person_id)
-
-    x2 <- table(community_members$age)
-
-    make_df <- function(xx) {
-      if(length(xx) > 1) {
-        y <- as.data.table(xx)
-        names(y) = c('age', deparse(substitute(xx)))
-        y$age <- as.numeric(y$age)
-        return(y)
-      } else {
-        y <- data.table(age = as.numeric(0:100), v = 0)
-        y$v <- as.numeric(y$v)
-        names(y) = c('age', deparse(substitute(xx)))
-        return(y)
-      }
-    }
-
-    xgrid <- make_df(x2)
-
-    # collapses across all environments
-    setnames(xgrid, 'x2', 'comm_sum')
-
-    xgrid$ref_age <- person_i$age
-    xgrid$ref_id  <- person_i$person_id
-
-    setnames(xgrid, 'age', 'contact_age')
-    xgrid
-
-    # commenting this out so can trace the sum
-    # xgrid <- xgrid[, .(ref_id, ref_age, contact_age, pt_sum)]
-
-
-    # subset to just non-empty rows
-    # xgrid <- subset(xgrid, pt_sum > 0)
-
-    xgrid
-
-    }, error = function(msg){
-      stop(paste0("ERROR AT i = ", i))
-    })
-
-    return(fxgrid)
-
-  }
-
-  my_fcn <- function(p_all) {
-    p <- progressor(along = p_all)
-    xx <- lapply(p_all, function(x) {
-      p(sprintf("x=%s", x))
-      get_simple_oo(x)
-    })
-    return(xx)
-  }
-
-  # takes a few minutes but not terrible3
-  x_l <- my_fcn(1:10)
-  x_l
-
-  # #333
-  x_l <- my_fcn(1:N_pop)
-  x_df <- do.call(rbind, x_l)
-
-  group_cols = c(
-    'ref_age', 'contact_age'
-  )
-
-  x_df_agg <- x_df[, .(
-    mean_comm_sum = sum(comm_sum)), by = group_cols
-  ]
-
-  out_df <- subset(x_df_agg, mean_comm_sum > 0)
-  out_df$lambda <- lambda_guess
-  out_df
-
-  out_df <- true_contact_mat[
-    out_df, on = c('ref_age', 'contact_age')
-  ]
-
-  out_df
-
-  return(out_df)
-
-}
-
-out_l <- lapply(c(2:20), get_mat_by_lambda)
-out_df_total <- do.call(rbind, out_l)
-
-library(tidyverse)
-out_df_total_agg <- out_df_total %>%
-  mutate(diff = mean_pt_sum - mean_comm_sum) %>%
-  group_by(lambda) %>%
-  summarize(
-    .groups = 'keep',
-    abs_mean_diff = abs(mean(diff)),
-    sd_diff = sd(diff)
-  )
-
-out_df_total_agg
-
-ggplot(out_df_total_agg, aes(x = factor(lambda),
-                             y  = abs_mean_diff,
-                             group = 1)) +
-  geom_line() + geom_point()
+# library(data.table)
+# library(ggplot2)
+# library(future)
+# library(future.apply)
+# library(progressr)
+#
+# # setup for parallel processing
+# plan(multisession, workers = 4)
+# nbrOfWorkers()
+# set.seed(1)
+# handlers(global = TRUE)
+# handlers("progress")
+#
+# age_dist <- readRDS("age_dist.RDS")
+# N_pop <- length(age_dist)
+# age_dist
+#
+# get_mat_by_lambda <- function(lambda_guess) {
+#
+#   # ********************
+#   # lambda_guess = 10
+#   # ********************
+#
+#   comm_vect <-  rep(lambda_guess, N_pop / lambda_guess)
+#
+#   if(N_pop %% lambda_guess > 0) {
+#     comm_vect = c(comm_vect, N_pop %% lambda_guess)
+#   }
+#
+#   comm_vect
+#   rand_rows <- sample(1:N_pop, N_pop)
+#   rand_rows
+#
+#   comm_id <-  1
+#   rr_i = 1
+#   comm_id_mat <- matrix(nrow = N_pop, ncol = 1)
+#   mat_i = 1
+#
+#   for(i in 1:length(comm_vect)) {
+#     this_grp_size <- comm_vect[i]
+#     these_rows <- rand_rows[rr_i:(rr_i + this_grp_size - 1)]
+#     comm_id_mat[these_rows, mat_i] <- comm_id
+#     # update counters
+#     comm_id = comm_id + 1
+#     rr_i = rr_i + this_grp_size
+#   }
+#
+#   comm_id_mat
+#
+#   age_dist
+#
+#   simple_pop_df <- data.table(
+#     person_id = 1:N_pop,
+#     age = age_dist,
+#     community_id = comm_id_mat[, 1]
+#   )
+#
+#   get_simple_oo <- function(i) {
+#
+#     fxgrid <- tryCatch({
+#
+#     # FOR EACH I
+#     person_i <- simple_pop_df[i, ]
+#
+#     c_id <-  person_i$community_id
+#
+#     community_members <- subset(simple_pop_df, community_id == c_id &
+#                                   person_id != person_i$person_id)
+#
+#     x2 <- table(community_members$age)
+#
+#     make_df <- function(xx) {
+#       if(length(xx) > 1) {
+#         y <- as.data.table(xx)
+#         names(y) = c('age', deparse(substitute(xx)))
+#         y$age <- as.numeric(y$age)
+#         return(y)
+#       } else {
+#         y <- data.table(age = as.numeric(0:100), v = 0)
+#         y$v <- as.numeric(y$v)
+#         names(y) = c('age', deparse(substitute(xx)))
+#         return(y)
+#       }
+#     }
+#
+#     xgrid <- make_df(x2)
+#
+#     # collapses across all environments
+#     setnames(xgrid, 'x2', 'comm_sum')
+#
+#     xgrid$ref_age <- person_i$age
+#     xgrid$ref_id  <- person_i$person_id
+#
+#     setnames(xgrid, 'age', 'contact_age')
+#     xgrid
+#
+#     # commenting this out so can trace the sum
+#     # xgrid <- xgrid[, .(ref_id, ref_age, contact_age, pt_sum)]
+#
+#
+#     # subset to just non-empty rows
+#     # xgrid <- subset(xgrid, pt_sum > 0)
+#
+#     xgrid
+#
+#     }, error = function(msg){
+#       stop(paste0("ERROR AT i = ", i))
+#     })
+#
+#     return(fxgrid)
+#
+#   }
+#
+#   my_fcn <- function(p_all) {
+#     p <- progressor(along = p_all)
+#     xx <- lapply(p_all, function(x) {
+#       p(sprintf("x=%s", x))
+#       get_simple_oo(x)
+#     })
+#     return(xx)
+#   }
+#
+#   # takes a few minutes but not terrible3
+#   x_l <- my_fcn(1:10)
+#   x_l
+#
+#   # #333
+#   x_l <- my_fcn(1:N_pop)
+#   x_df <- do.call(rbind, x_l)
+#
+#   group_cols = c(
+#     'ref_age', 'contact_age'
+#   )
+#
+#   x_df_agg <- x_df[, .(
+#     mean_comm_sum = sum(comm_sum)), by = group_cols
+#   ]
+#
+#   out_df <- subset(x_df_agg, mean_comm_sum > 0)
+#   out_df$lambda <- lambda_guess
+#   out_df
+#
+#   out_df <- true_contact_mat[
+#     out_df, on = c('ref_age', 'contact_age')
+#   ]
+#
+#   out_df
+#
+#   return(out_df)
+#
+# }
+#
+# out_l <- lapply(c(2:20), get_mat_by_lambda)
+# out_df_total <- do.call(rbind, out_l)
+#
+# library(tidyverse)
+# out_df_total_agg <- out_df_total %>%
+#   mutate(diff = mean_pt_sum - mean_comm_sum) %>%
+#   group_by(lambda) %>%
+#   summarize(
+#     .groups = 'keep',
+#     abs_mean_diff = abs(mean(diff)),
+#     sd_diff = sd(diff)
+#   )
+#
+# out_df_total_agg
+#
+# ggplot(out_df_total_agg, aes(x = factor(lambda),
+#                              y  = abs_mean_diff,
+#                              group = 1)) +
+#   geom_line() + geom_point()
 
 
 ## ============================================================================
@@ -607,9 +607,8 @@ int_ternary_search <- function(f, low, high, max_iter = 50, quiet = T) {
   candidates[which.min(prev_guesses[paste0(candidates)])]
 }
 
-int_ternary_search(get_mat_by_lambda2, 2, 50)
+int_ternary_search(get_mat_by_lambda2, 2, 20)
 
- res
 
 ### BRUTE FORCE
 out_l <- lapply(c(2:20), get_mat_by_lambda2)
