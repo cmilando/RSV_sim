@@ -386,11 +386,11 @@ NumericMatrix set_ids_single_cpp(
   }
 
   // set all 0 to NA
-  for(int i = 0; i < df.nrow(); i++) {
-    if(df(i, target_col) == 0) {
-      df(i, target_col) = NA_REAL;
-    }
-  }
+  // for(int i = 0; i < df.nrow(); i++) {
+  //   if(df(i, target_col) == 0) {
+  //     df(i, target_col) = NA_REAL;
+  //   }
+  // }
 
   // cleanup
   Rcpp::Rcout << "Number of groups:" << ii - 1  <<"\n";

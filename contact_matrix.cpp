@@ -37,10 +37,10 @@ DataFrame contact_matrix_cpp(
   //
   // So:
   //   hh_counts[g][a] = number of people age 'a' in household 'g'
-  std::vector<std::array<int,101>> hh_counts(max_hh);
-  std::vector<std::array<int,101>> work_counts(max_work);
-  std::vector<std::array<int,101>> school_counts(max_school);
-  std::vector<std::array<int,101>> comm_counts(max_comm);
+  std::vector<std::array<int,101>> hh_counts(max_hh + 1);
+  std::vector<std::array<int,101>> work_counts(max_work + 1);
+  std::vector<std::array<int,101>> school_counts(max_school + 1);
+  std::vector<std::array<int,101>> comm_counts(max_comm + 1);
 
   // Initialize all counts to zero.
   //
@@ -58,6 +58,15 @@ DataFrame contact_matrix_cpp(
   const double* com_id  = REAL(community_id);
   const int* ag         = INTEGER(age);
 
+  // ***** DIAGNOSTICS *****
+  if(false) {
+    for(int i=0; i<N; i++) {
+        Rcpp::Rcout << sch_id[i] << "\t";
+    }
+    Rcpp::Rcout <<"\n";
+    Rcpp::stop("end here");
+  }
+
   // loop over every individual
   for(int i = 0; i < N; i++) {
 
@@ -65,28 +74,43 @@ DataFrame contact_matrix_cpp(
     const int a = ag[i];
 
     // HOUSEHOLD
-    if(!ISNA(hh_id[i])) {
+    if(!(hh_id[i] == 0.0)) {
       int g = (int) hh_id[i];  // cast the current hh_id to an integer
       hh_counts[g][a]++;       // increment the age count by 1
     }
 
     // WORK
-    if(!ISNA(wk_id[i])) {
+    if(!(wk_id[i] == 0.0)) {
       int g = (int) wk_id[i];
       work_counts[g][a]++;
     }
 
     // SCHOOL
-    if(!ISNA(sch_id[i])) {
+    if(!(sch_id[i] == 0.0)) {
+
       int g = (int) sch_id[i];
+      // Rcpp::Rcout <<"should iterate " <<
+      //   " g: " << g << ", sch_id[i]: " << sch_id[i] <<
+      //     ", a: " << a << "\n";
       school_counts[g][a]++;
     }
 
     // COMMUNITY
-    if(!ISNA(com_id[i])) {
+    if(!(com_id[i] == 0.0)) {
       int g = (int) com_id[i];
       comm_counts[g][a]++;
     }
+  }
+
+  // ***** DIAGNOSTICS *****
+  if(false) {
+    for(int i=0; i<school_counts.size(); i++) {
+      for(int j=0; j<101; j++) {
+        Rcpp::Rcout << school_counts[i][j] << "\t";
+      }
+    }
+    Rcpp::Rcout <<"\n";
+    Rcpp::stop("ending here");
   }
 
   //--------------------------------------------------
@@ -97,7 +121,6 @@ DataFrame contact_matrix_cpp(
   NumericMatrix work(NAGE, NAGE);
   NumericMatrix school(NAGE, NAGE);
   NumericMatrix comm(NAGE, NAGE);
-
   NumericVector n_ref(NAGE);
 
   for(int i=0; i<N; i++) {
@@ -109,7 +132,7 @@ DataFrame contact_matrix_cpp(
     n_ref[ref_age]++;
 
     // Household
-    if(!NumericVector::is_na(household_id[i])) {
+    if(!(household_id[i] == 0)) {
 
       // type cast
       int gid = (int) household_id[i];
@@ -124,7 +147,7 @@ DataFrame contact_matrix_cpp(
 
 
     // Work
-    if(!NumericVector::is_na(work_id[i])) {
+    if(!(work_id[i] == 0)) {
 
       // type cast
       int gid = (int) work_id[i];
@@ -137,7 +160,7 @@ DataFrame contact_matrix_cpp(
     }
 
     // School
-    if(!NumericVector::is_na(school_id[i])) {
+    if(!(school_id[i] == 0)) {
 
       // type cast
       int gid = (int) school_id[i];
@@ -151,7 +174,7 @@ DataFrame contact_matrix_cpp(
 
 
     // Community
-    if(!NumericVector::is_na(community_id[i])) {
+    if(!(community_id[i] == 0)) {
 
       // type cast
       int gid = (int) community_id[i];
@@ -162,6 +185,20 @@ DataFrame contact_matrix_cpp(
       // remove self
       comm(ref_age, ref_age)--;
     }
+  }
+
+  // ***** DIAGNOSTICS *****
+  if(false) {
+    Rcpp::Rcout <<"Here\n";
+    for(int i=0; i<101; i++) {
+      for(int j=0; j<101; j++) {
+        if(school(i, j) != 0) {
+          Rcpp::Rcout << school(i, j) << "\n";
+        }
+      }
+    }
+    Rcpp::Rcout <<"\n";
+    Rcpp::stop("stopping early");
   }
 
   //--------------------------------------------------
@@ -179,6 +216,7 @@ DataFrame contact_matrix_cpp(
   NumericVector comm_out(OUT);
 
   NumericVector total_out(OUT);
+  // NumericVector total_out_sum(OUT);
 
   int idx = 0;
 
@@ -203,6 +241,7 @@ DataFrame contact_matrix_cpp(
         school_out[idx] = NA_REAL;
         comm_out[idx] = NA_REAL;
         total_out[idx] = NA_REAL;
+        // total_out_sum[idx] = NA_REAL;
 
       } else {
 
@@ -216,6 +255,9 @@ DataFrame contact_matrix_cpp(
 
         total_out[idx] =
           (hh(a,b) + work(a,b) + school(a,b) + comm(a,b)) / denom;
+
+        // total_out_sum[idx] =
+        //   (hh(a,b) + work(a,b) + school(a,b) + comm(a,b));
 
       }
 
