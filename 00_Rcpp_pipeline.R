@@ -8,8 +8,6 @@ library(data.table)
 library(Rcpp)
 
 # get files
-sourceCpp("fsubset.cpp")
-sourceCpp("ransam.cpp")
 sourceCpp("set_ids.cpp")
 
 # some basic tests
@@ -17,7 +15,7 @@ intv = as.integer(1:10)
 ransam_cpp(intv, 9)
 
 # how large is the population
-N <- 1e4
+N <- 1e5
 
 #' ============================================================================
 #' ////////////////////////////////////////////////////////////////////////////
@@ -228,8 +226,8 @@ ggplot(true_contact_mat) +
 #' ////////////////////////////////////////////////////////////////////////////
 #' ============================================================================
 
-age_dist <- readRDS("age_dist.RDS")
 N_pop <- length(age_dist)
+N_pop
 
 get_mat_by_lambda2 <- function(lambda_guess) {
 
@@ -358,9 +356,8 @@ names(out_df_total_agg)[1] <- 'msd'
 setDT(out_df_total_agg)
 out_df_total_agg
 
-ggplot(out_df_total_agg, aes(x = factor(lambda),
-                             y  = msd,
-                             group = 1)) +
+ggplot(out_df_total_agg, aes(x = lambda,
+                             y  = msd)) +
   geom_line() +
   geom_point() +
   ggpubr::theme_classic2()  +
