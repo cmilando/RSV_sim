@@ -51,8 +51,9 @@ us_age[, proportion := population / sum(population)]
 
 head(us_age)
 
-# contact matrix
-age_dist <- sample(us_age$age, size = N,
+# get a representative sample
+age_dist <- sample(us_age$age,
+                   size = N,
                    prob = us_age$proportion,
                    replace = T)
 
@@ -189,3 +190,41 @@ table(pop_df$community_id)
 
 # ***********************
 saveRDS(pop_df, "demo_pop.RDS")
+
+#' ============================================================================
+#' ////////////////////////////////////////////////////////////////////////////
+#' get contact matrix
+#' ////////////////////////////////////////////////////////////////////////////
+#' ============================================================================
+
+Rcpp::sourceCpp("contact_matrix.cpp")
+
+contact_mat <- contact_matrix_cpp(
+  age          = as.integer(pop_df$age),
+  household_id = pop_df$household_id,
+  max_hh       = as.integer(max(pop_df$household_id, na.rm = T)),
+  work_id      = pop_df$work_id,
+  max_work     = as.integer(max(pop_df$work_id, na.rm = T)),
+  school_id    = pop_df$school_id,
+  max_school   = as.integer(max(pop_df$school_id, na.rm = T)),
+  community_id = pop_df$community_id,
+  max_comm     = as.integer(max(pop_df$community_id, na.rm = T))
+)
+
+contact_mat <- as.data.table(contact_mat)
+contact_mat
+
+summary(contact_mat)
+
+library(ggplot2)
+
+ggplot(contact_mat) +
+  geom_tile(aes(x = ref_age, y = contact_age, fill = total)) +
+  scale_fill_viridis_c()
+
+#' ============================================================================
+#' ////////////////////////////////////////////////////////////////////////////
+#' get contact matrix
+#' ////////////////////////////////////////////////////////////////////////////
+#' ============================================================================
+
