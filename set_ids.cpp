@@ -126,7 +126,7 @@ Rcpp::List get_ids_cpp(
 }
 
 //   !--------------------------------------------------------------------------
-//   ! Set ids
+//   ! Set ids - two group
 //   !--------------------------------------------------------------------------
 
 // [[Rcpp::export]]
@@ -256,25 +256,19 @@ NumericMatrix set_ids_cpp(
 
   }
 
-  // cleanup
-  Rcpp::Rcout << "Number of groups:" << ii  <<"\n";
-  Rcpp::Rcout << "Last group size:" << vec[ii] << "\n";
-
   // ---------------------------------------------------------
   // Assign remaining (-1) individuals into households
   // ---------------------------------------------------------
 
+  int hh_id = ii;
   std::vector<int> rr;
 
-  double max_id = 0.0;
-
+  // find the empty rows
   for (int i = 0; i < df.nrow(); i++) {
 
     if (df(i, target_col) == 0)
       rr.push_back(i);
 
-    if (df(i, target_col) > max_id)
-      max_id = df(i, target_col);
   }
 
   int n_remaining = rr.size();
@@ -318,9 +312,6 @@ NumericMatrix set_ids_cpp(
       rand_rows[i] = rr[rand_idx[i] - 1];
 
     // assign household ids
-
-    int hh_id = static_cast<int>(max_id) + 1;
-
     int rr_i = 0;
 
     for (size_t i = 0; i < n_grps.size(); i++) {
@@ -336,6 +327,73 @@ NumericMatrix set_ids_cpp(
       rr_i += this_grp_size;
     }
   }
+
+  // cleanup
+  Rcpp::Rcout << "Number of groups:" << hh_id - 1  <<"\n";
+
+  return df;
+}
+
+//   !--------------------------------------------------------------------------
+//   ! Set ids - two group
+//   !--------------------------------------------------------------------------
+
+// [[Rcpp::export]]
+NumericMatrix set_ids_single_cpp(
+    NumericMatrix df,
+    IntegerVector vec,
+    int age_col,
+    int target_col,
+    double age0,
+    double age1)
+  {
+
+  // intiliaze
+  bool continue_loop = true;
+  int ii = 1;
+
+  // while loop
+  while (continue_loop) {
+
+    //
+    if (ii % 1000 == 0)
+      Rcpp::Rcout << ii << "\t";
+
+    // get this total group size
+    int total_grp_size = vec[ii - 1];
+
+    // get the rows to select
+    List out1 = get_ids_cpp(df, total_grp_size, age_col,
+                            age0, age1 - 1, target_col);
+
+    // get the output from get_ids
+    IntegerVector grp1_rows = out1["rows"];
+    bool local_continue = out1["continue"];
+
+    // set the target col to ii
+    for (int i = 0; i < grp1_rows.size(); i++) {
+      df(grp1_rows[i], target_col) = ii;
+    }
+
+    // check
+    if(!local_continue) {
+      Rcpp::Rcout << "out1 continue is FALSE -" << total_grp_size << "- \n";
+      continue_loop = false;
+    }
+
+    ii = ii + 1;
+
+  }
+
+  // set all 0 to NA
+  for(int i = 0; i < df.nrow(); i++) {
+    if(df(i, target_col) == 0) {
+      df(i, target_col) = NA_REAL;
+    }
+  }
+
+  // cleanup
+  Rcpp::Rcout << "Number of groups:" << ii - 1  <<"\n";
 
   return df;
 }

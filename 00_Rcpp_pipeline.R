@@ -16,13 +16,53 @@ sourceCpp("set_ids.cpp")
 intv = as.integer(1:10)
 ransam_cpp(intv, 9)
 
+# how large is the population
+N <- 1e5
+
+#' ============================================================================
+#' ////////////////////////////////////////////////////////////////////////////
+#' AGE DISTRIBUTION
+#' ////////////////////////////////////////////////////////////////////////////
+#' ============================================================================
+
+library(data.table)
+
+# Census Vintage 2024 national age-sex estimates
+url <- paste0(
+  "https://www2.census.gov/programs-surveys/popest/datasets/",
+  "2020-2024/national/asrh/nc-est2024-agesex-res.csv"
+)
+
+dt <- fread(url)
+table(dt$SEX)
+
+# Total population (both sexes)
+us_age <- dt[
+  AGE < 999 & SEX == 0,
+  .(age = AGE,
+    population = POPESTIMATE2024)
+]
+
+table(us_age$age)
+sum(us_age$population)
+
+# Convert to proportions
+us_age[, proportion := population / sum(population)]
+
+head(us_age)
+
+# contact matrix
+age_dist <- sample(us_age$age, size = N,
+                   prob = us_age$proportion,
+                   replace = T)
+
+saveRDS(age_dist, 'age_dist.RDS')
+
 #' ============================================================================
 #' ////////////////////////////////////////////////////////////////////////////
 #' CREATE DATA
 #' ////////////////////////////////////////////////////////////////////////////
 #' ============================================================================
-
-N <- 1e1
 
 # knowns
 # adding 1 because these can never be 0
@@ -30,30 +70,19 @@ household_sizes <- rpois(N, 3) + 1  # comes from ACS
 work_sizes      <- rpois(N, 20) + 1   # comes from BLS
 school_sizes    <- rpois(N, 50) + 1  # comes from somewhere
 
-household_sizes <- rep(4, N )
-work_sizes <- rep(5, N )
-school_sizes <- rep(5, N )
-
-summary(household_sizes)
+# *******
+# debug
+# *******
+# household_sizes <- rep(4, N )
+# work_sizes <- rep(5, N )
+# school_sizes <- rep(7, N )
+# *********
 
 # unknown
 # this is just used to create the contact matrix
 # we'll solve for this next
 community_size_true <- rpois(N, 50)
 stopifnot(all(community_size_true > 0))
-
-community_size_true <- rep(15, N )
-community_size_true
-
-# contact matrix
-# ok so first you need an age distribution
-# lets just assume its uniform
-age_dist <- round(runif(N, min = 0, max = 100))
-age_dist <- c(rep(15, N/2), rep(30, N/2))
-hist(age_dist)
-age_dist_df <- data.frame(table(age_dist))
-names(age_dist_df)
-saveRDS(age_dist, 'age_dist.RDS')
 
 # now create your population dataset
 reset_pop_df <- function() {
@@ -64,6 +93,7 @@ reset_pop_df <- function() {
              school_id = numeric(N),
              community_id = numeric(N))
 }
+
 pop_df <- reset_pop_df()
 pop_df
 
@@ -83,14 +113,14 @@ pop_df
 table(pop_df$age)
 
 # test
-get_ids_cpp(
-  df = as.matrix(pop_df),
-  n = as.integer(5),
-  age_col = as.integer(2),
-  age_lower = 0,
-  age_upper = 25,
-  target_col = as.integer(3)
-)
+# get_ids_cpp(
+#   df = as.matrix(pop_df),
+#   n = as.integer(5),
+#   age_col = as.integer(2),
+#   age_lower = 0,
+#   age_upper = 25,
+#   target_col = as.integer(3)
+# )
 
 # ***********************
 # HOUSEHOLD
@@ -108,4 +138,54 @@ oo <- set_ids_cpp(
 )
 
 pop_df <- as.data.table(oo)
+pop_df
 
+# ***********************
+# SCHOOL
+oo <- set_ids_single_cpp(
+   df = as.matrix(pop_df),
+   vec = as.integer(school_sizes),
+   age_col = as.integer(2 - 1),
+   target_col = as.integer(5 - 1),
+   age0 = 0,
+   age1 = 20
+)
+
+##
+pop_df <- as.data.table(oo)
+head(pop_df)
+table(pop_df$school_id, useNA = 'ifany')
+
+# ***********************
+# WORK
+oo <- set_ids_single_cpp(
+  df = as.matrix(pop_df),
+  vec = as.integer(work_sizes),
+  age_col = as.integer(2 - 1),
+  target_col = as.integer(4 - 1),
+  age0 = 20,
+  age1 = 100
+)
+
+##
+pop_df <- as.data.table(oo)
+pop_df
+
+# ***********************
+# COMMUNITY
+oo <- set_ids_single_cpp(
+  df = as.matrix(pop_df),
+  vec = as.integer(community_size_true),
+  age_col = as.integer(2 - 1),
+  target_col = as.integer(6 - 1),
+  age0 = 0,
+  age1 = 100
+)
+
+##
+pop_df <- as.data.table(oo)
+pop_df
+table(pop_df$community_id)
+
+# ***********************
+saveRDS(pop_df, "demo_pop.RDS")
