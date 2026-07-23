@@ -6,10 +6,12 @@ library(data.table)
 #' ////////////////////////////////////////////////////////////////////////////
 #' ============================================================================
 
-
-
 pop_df <- readRDS("demo_pop.RDS")
 head(pop_df)
+
+## add asyptomatic
+set.seed(1234)
+pop_df$asymptomatic <- runif(nrow(pop_df)) < 0.1
 
 time_activity = data.table(
   hour = 0:23,
@@ -26,6 +28,8 @@ mode(ta_mat) <- 'integer'
 ta_mat
 
 Rcpp::sourceCpp("get_timeseries.cpp")
+set.seed(123) # so certain random things always flip the same way
+
 out <- get_timeseries(
   df_mat,
   ta_mat,
