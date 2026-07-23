@@ -43,6 +43,7 @@ us_age <- dt[
     population = POPESTIMATE2024)
 ]
 
+# seems like this is just 0-100 ages
 table(us_age$age)
 sum(us_age$population)
 
