@@ -133,7 +133,7 @@ oo <- set_ids_cpp(
   p2 = 0.5,
   age0 = 0,
   age1 = 25,
-  age2 = 125
+  age2 = 100
 )
 
 pop_df <- as.data.table(oo)
@@ -187,7 +187,7 @@ pop_df <- as.data.table(oo)
 pop_df
 table(pop_df$community_id)
 
-# saveRDS(pop_df, "demo_pop.RDS")
+saveRDS(pop_df, "demo_pop.RDS")
 
 #' ============================================================================
 #' ////////////////////////////////////////////////////////////////////////////
@@ -216,8 +216,10 @@ summary(true_contact_mat$ref_age)
 
 library(ggplot2)
 
+head(true_contact_mat)
+
 ggplot(true_contact_mat) +
-  geom_tile(aes(x = ref_age, y = contact_age, fill = total)) +
+  geom_tile(aes(x = ref_age, y = contact_age, fill = household)) +
   scale_fill_viridis_c()
 
 #' ============================================================================
