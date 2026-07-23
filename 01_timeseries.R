@@ -6,7 +6,7 @@ library(data.table)
 #' ////////////////////////////////////////////////////////////////////////////
 #' ============================================================================
 
-Rcpp::sourceCpp("get_timeseries.cpp")
+
 
 pop_df <- readRDS("demo_pop.RDS")
 head(pop_df)
@@ -25,20 +25,31 @@ ta_mat <- as.matrix(time_activity)
 mode(ta_mat) <- 'integer'
 ta_mat
 
+Rcpp::sourceCpp("get_timeseries.cpp")
 out <- get_timeseries(
   df_mat,
   ta_mat,
-  hh_V     = 100,
-  school_V = 100,
-  work_V   = 100,
-  comm_V   = 100,
-  n_days = as.integer(1),
+  hh_V     = 10,  # m^3
+  school_V = 100, # m^3
+  work_V   = 100, # m^3
+  comm_V   = 100, # m^3
+  n_days = as.integer(2),
   max_comm = as.integer(max(pop_df$community_id)),
   max_school =  as.integer(max(pop_df$school_id)),
   max_hh = as.integer(max(pop_df$household_id)),
   max_work = as.integer(max(pop_df$work_id))
 )
 
-dim(out$hh)
+conc = out$hh[1, ]
+hhdt = data.table(conc, hour = 0:(length(conc) - 1))
 
-head(out$hh)
+library(ggplot2)
+library(ggpubr)
+
+ggplot(hhdt) + theme_classic2() +
+  geom_line(aes(x = hour, y = conc), color = 'blue') +
+  geom_vline(xintercept = c(7, 17, 23 + 8, 24 + 17),
+             linetype = 'dashed', linewidth = 0.25) +
+  ggtitle("household RSV concentration")
+
+

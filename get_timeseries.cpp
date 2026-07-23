@@ -133,6 +133,9 @@ List get_timeseries(
   // overall timestep counter
   int timestep = 0;
 
+  // initial concentrations
+  float hh_zero = 0;
+
   // loop
   for(int day_i = 0; day_i < n_days; day_i++) {
 
@@ -163,9 +166,22 @@ List get_timeseries(
 
       // Overall equation
       // dcdt = 1/V *  (E - Q * C - k*V*C)
-      //      = E / V  - C * (Q / V - k)
+      //      = E / V  - C * (Q / V + k)
       // [mass/volume/time]
       // C = C + dcdt;
+
+      // Source
+      float E = 10; // mass/time
+
+      // Airflow
+      float Q = 0.5; // volume/time
+
+      // decay rate
+      float k = 0.1; // 1/time
+
+      // concentration
+      float C;
+      float currE;
 
       // ALL HOUSEHOLDS
       for(int hh_i = 0; hh_i < max_hh; hh_i++) {
@@ -175,7 +191,26 @@ List get_timeseries(
         // these are rows
         // well no not really, these are person IDs
 
-        hh_mat(hh_i, timestep) = 1;
+        // current concentration
+        if(timestep == 0) {
+          C = hh_zero;
+        } else {
+          C = hh_mat(hh_i, timestep - 1);
+        }
+
+        // introduce varying E
+        if(hour_i < 8 | hour_i > 17) {
+          currE = E;
+        } else {
+          currE = 0;
+        }
+
+        // change: Sources (breathing) - Sinks (Airflow and decay rates)
+        float dcdt = currE / hh_V - C * (Q / hh_V + k);
+
+        // Rcpp::Rcout << "("<< dcdt << ")\t";
+
+        hh_mat(hh_i, timestep) = std::max<float>(0.0, C + dcdt);
 
       }
 
