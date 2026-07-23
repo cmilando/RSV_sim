@@ -26,12 +26,14 @@ N <- 1e5
 library(data.table)
 
 # Census Vintage 2024 national age-sex estimates
-url <- paste0(
-  "https://www2.census.gov/programs-surveys/popest/datasets/",
-  "2020-2024/national/asrh/nc-est2024-agesex-res.csv"
-)
+# url <- paste0(
+#   "https://www2.census.gov/programs-surveys/popest/datasets/",
+#   "2020-2024/national/asrh/nc-est2024-agesex-res.csv"
+# )
 
-dt <- fread(url)
+# dt <- fread(url)
+
+dt <- data.table::fread(file = "nc-est2024-agesex-res.csv")
 table(dt$SEX)
 
 # Total population (both sexes)
@@ -48,6 +50,7 @@ sum(us_age$population)
 us_age[, proportion := population / sum(population)]
 
 head(us_age)
+sum(us_age$population) / 1e6
 
 # get a representative sample
 age_dist <- sample(us_age$age,
