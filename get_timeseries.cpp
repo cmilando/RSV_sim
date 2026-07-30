@@ -25,6 +25,7 @@ struct Person {
   //
   bool asymptomatic;
   bool stays_home;
+  bool is_incident;
   float internal_viral_mass; // in #,
   int SEIR_status;
   //     0 = Susceptible
@@ -94,7 +95,8 @@ struct Person {
     float age_float = (float) age;
 
     // imperfect adjustment for age but not terrible for now
-    float inhalation_flux = base_inhalation_flux * age_float / 30.0; // m^3 / hr
+    // float inhalation_flux = base_inhalation_flux * age_float / 30.0; // m^3 / hr
+    float inhalation_flux = base_inhalation_flux;
 
     // if you are infected or recovered, you cannot increase
     if(SEIR_status == 2 | SEIR_status == 3) {
@@ -126,8 +128,11 @@ struct Person {
     // sink = [mass/time]
     float dmdt = src - internal_viral_mass * viral_decay;
 
-    // and update the concentration
+    // and update the internal mass
     internal_viral_mass = std::max<float>(0, internal_viral_mass + dmdt);
+
+    // incident is only true if you turn incident this timestep
+    is_incident = false;
 
     // now update SEIR status
     if(SEIR_status == 0) {
@@ -149,6 +154,7 @@ struct Person {
         timesteps_for_incubation--;
         if(timesteps_for_incubation == 0) {
           SEIR_status = 2;
+          is_incident = true; // the only time this occurs
         }
       }
 
@@ -208,6 +214,7 @@ struct Person {
          int community_,
          bool asymptomatic_,
          bool stays_home_,
+         bool is_incident_ = false,
          float internal_viral_mass_ = 0.0,
          int SEIR_status_ = 0,
          int timesteps_for_incubation_ = 24 * 2, // 24 hours * 2 days
@@ -220,6 +227,7 @@ struct Person {
       community_id(community_),
       asymptomatic(asymptomatic_),
       stays_home(stays_home_),
+      is_incident(is_incident_),
       internal_viral_mass(internal_viral_mass_),
       SEIR_status(SEIR_status_),
       timesteps_for_incubation(timesteps_for_incubation_),
@@ -319,7 +327,10 @@ List get_timeseries(
     float school_V,
     float comm_V,
     IntegerVector personIDs_to_track,
-    IntegerVector hhIDs_to_track
+    IntegerVector hhIDs_to_track,
+    IntegerVector workIDs_to_track,
+    IntegerVector schoolIDs_to_track,
+    IntegerVector commIDs_to_track
 ) {
 
   Rcpp::Rcout << "Initialize\n";
@@ -328,6 +339,8 @@ List get_timeseries(
   const int n_hours_per_day = 24;
   const int n_timesteps = n_hours_per_day * n_days;
 
+  const int n_ages = 100 + 1; //0 to 100
+
   const int max_hh = Rcpp::max(df(_, 2));
   const int max_work = Rcpp::max(df(_, 3));
   const int max_school = Rcpp::max(df(_, 4));
@@ -335,32 +348,45 @@ List get_timeseries(
 
   const int ntrack_people = personIDs_to_track.size();
   const int ntrack_hh = hhIDs_to_track.size();
+  const int ntrack_ww = workIDs_to_track.size();
+  const int ntrack_ss = schoolIDs_to_track.size();
+  const int ntrack_cc = commIDs_to_track.size();
 
   // ----------------------------------------------
-  // **** ENVIRONMENT CONCENETRATION MATRICES *****
+  // **** ENVIRONMENT CONCENETRATION VECTORS *****
   // ----------------------------------------------
   Rcpp::Rcout << "Environment Concentrations \n";
-  // get matrices for concentrations in each environment and time
-  // rearranging this so the largest dimension is the rows
+
+  // get matrices for concentrations in each environment
+  // choosing not to save all concentrations for all times and instead
+  // just tracking those below
   std::vector<float> hh_conc(max_hh);
   std::vector<float> ww_conc(max_work);
   std::vector<float> ss_conc(max_school);
   std::vector<float> cc_conc(max_comm);
 
-  Rcpp::Rcout << hh_conc[0] << "\n";
-
   // ----------------------------------------------
-  // **** ENVIRONMENT CONCENETRATION MATRICES *****
+  // **** TRACKING MATRICES *****
   // ----------------------------------------------
   Rcpp::Rcout << "Track matrices\n";
+
   // get matrices for concentrations in each environment and time
   // rearranging this so the largest dimension is the rows
   Rcpp::NumericMatrix person_mat(n_timesteps, ntrack_people);
   Rcpp::NumericMatrix seir_mat(n_timesteps, ntrack_people);
   Rcpp::NumericMatrix hh_mat(n_timesteps, ntrack_hh);
+  Rcpp::NumericMatrix ww_mat(n_timesteps, ntrack_ww);
+  Rcpp::NumericMatrix ss_mat(n_timesteps, ntrack_ss);
+  Rcpp::NumericMatrix cc_mat(n_timesteps, ntrack_cc);
+
+  // Also want to track age-specific incidence and prevalence
+  // Incidence is number of *new cases* this timestep
+  // Prevalence is total number of cases at this time
+  Rcpp::NumericMatrix incidence_mat(n_timesteps, n_ages);
+  Rcpp::NumericMatrix prevalence_mat(n_timesteps, n_ages);
 
   // ----------------------------------------------
-  // **** ENVIRONMENT LOOKUP TABLES *****
+  // **** NETWORK LOOKUP TABLES *****
   // ----------------------------------------------
   // build the lookup tables
   Rcpp::Rcout << "Lookup tables\n";
@@ -409,18 +435,14 @@ List get_timeseries(
     );
   }
 
-  // and someone needs to be the initial infector
-  // or maybe some small subset of people, maybe one community
-  Rcpp::IntegerVector initial_infectors = Rcpp::wrap(hh_lookup[0]);
-  int n_infectors = initial_infectors.size();
-  int infect_id;
+  // seed the infections
   Rcpp::Rcout << "Initial infectors\n";
-  for(int pi = 0; pi < n_infectors; pi++) {
-    infect_id = initial_infectors[pi];
-    people[infect_id].infect();
-    people[infect_id].print_self();
+  for(int pi = 0; pi < n_people; pi++) {
+    if(df(pi, 8) == 1) {
+      people[pi].infect();
+    }
+    //people[infect_id].print_self();
   }
-  Rcpp::Rcout << "\n";
 
   // ----------------------------------------------
   // **** MAIN LOOP *****
@@ -443,7 +465,11 @@ List get_timeseries(
   int this_id;
   int this_zone;
 
-  Rcpp::Rcout << "\n********************************"<< "\n";
+  // incidence and prevalence
+  Rcpp::IntegerVector incidence_sum(n_ages);
+  Rcpp::IntegerVector prevalence_sum(n_ages);
+
+  Rcpp::Rcout << "********************************"<< "\n";
   Rcpp::Rcout << "DAY: ";
 
   // loop
@@ -456,6 +482,12 @@ List get_timeseries(
       // HOURS ARE defined by the time-activity matrix and you calculate
       // everything at all environments each timestep to account
       // for lingering concentrations
+
+      // reset these each timestep
+      for(int ni = 0; ni < n_ages; ni ++) {
+        incidence_sum[ni] = 0;
+        prevalence_sum[ni] = 0;
+      }
 
       // ***********************
       // ALL HOUSEHOLDS
@@ -511,6 +543,7 @@ List get_timeseries(
 
       // ***********************
       // now save the ones you are tracking
+      // assumes you have one in each
       for(int ti = 0; ti < ntrack_people; ti ++) {
         this_id = personIDs_to_track[ti];
         person_mat(timestep, ti) = people[this_id].internal_viral_mass;
@@ -519,6 +552,32 @@ List get_timeseries(
       for(int ti = 0; ti < ntrack_hh; ti ++) {
         this_id = hhIDs_to_track[ti];
         hh_mat(timestep, ti) = hh_conc[this_id];
+      }
+      for(int ti = 0; ti < ntrack_ww; ti ++) {
+        this_id = workIDs_to_track[ti];
+        ww_mat(timestep, ti) = ww_conc[this_id];
+      }
+      for(int ti = 0; ti < ntrack_ss; ti ++) {
+        this_id = schoolIDs_to_track[ti];
+        ss_mat(timestep, ti) = ss_conc[this_id];
+      }
+      for(int ti = 0; ti < ntrack_cc; ti ++) {
+        this_id = commIDs_to_track[ti];
+        cc_mat(timestep, ti) = cc_conc[this_id];
+      }
+
+      // and the overall incidence and prevalence trackers
+      for(int pi = 0; pi < n_people; pi ++) {
+        if(people[pi].is_incident) {
+          incidence_sum[people[pi].age]++;
+        }
+        if(people[pi].SEIR_status == 2) {
+          prevalence_sum[people[pi].age]++;
+        }
+      }
+      for(int ni = 0; ni < n_ages; ni ++) {
+        incidence_mat(timestep, ni) = incidence_sum[ni];
+        prevalence_mat(timestep, ni) = prevalence_sum[ni];
       }
 
       // ITERATE
@@ -531,9 +590,14 @@ List get_timeseries(
   Rcpp::Rcout << "COMPLETE.\n";
 
   return List::create(
-    _["hh"] = hh_mat,
-    _["person_c"] = person_mat,
-    _["person_seir"] = seir_mat
+    _["person_mass"]    = person_mat,
+    _["person_seir"]    = seir_mat,
+    _["household_conc"] = hh_mat,
+    _["school_conc"]    = ss_mat,
+    _["work_conc"]      = ww_mat,
+    _["community_conc"] = cc_mat,
+    _["incidence"]      = incidence_mat,
+    _["prevalence"]     = prevalence_mat
   );
 
 }

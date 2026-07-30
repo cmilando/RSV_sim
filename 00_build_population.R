@@ -134,7 +134,7 @@ oo <- set_ids_cpp(
   p1 = 0.5,
   p2 = 0.5,
   age0 = 0,
-  age1 = 25,
+  age1 = 20,
   age2 = 100
 )
 

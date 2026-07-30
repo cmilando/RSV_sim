@@ -1,5 +1,30 @@
 library(data.table)
 library(jsonlite)
+library(ggplot2)
+library(ggpubr)
+library(patchwork)
+
+get_rect_hours <- function(starttime, n_days) {
+  xx <- rep(24, n_days)
+  yy <- 0:(n_days - 1)
+  zz <- xx * yy
+  o <- rep(starttime, n_days)
+  return(o + zz)
+}
+
+make_bars <- function(starttime, endtime, xfill) {
+  return(annotate(geom = 'rect',
+                  xmin = get_rect_hours(starttime, n_days),
+                  xmax = get_rect_hours(endtime, n_days),
+                  ymin= -Inf, ymax = Inf, fill = xfill))
+}
+
+get_melt <- function(x, xnames) {
+  x = data.table(x)
+  names(x) = as.character(xnames)
+  x$hour = 1:nrow(x)
+  return(melt(x, id.vars = "hour"))
+}
 
 #' ============================================================================
 #' ////////////////////////////////////////////////////////////////////////////
@@ -14,11 +39,11 @@ dim(pop_df)
 # set up some things to track
 # huh, they have both a work ID and school ID, thats .... incorrect ... ?
 # also seems like
-hh_ids <- c(0, 1)
+hh_ids <- c(0, 1, 5)
 subset(pop_df, household_id %in% hh_ids)
 person_IDs = subset(pop_df, household_id %in% hh_ids)$person_id
-work_IDs = subset(pop_df, household_id %in% hh_ids)$work_id
-school_IDs = subset(pop_df, household_id %in% hh_ids)$school_id
+work_IDs = subset(pop_df, household_id %in% hh_ids & work_id != -999)$work_id
+school_IDs = subset(pop_df, household_id %in% hh_ids & school_id != -999)$school_id
 comm_IDs = subset(pop_df, household_id %in% hh_ids)$community_id
 
 track_list = list(person_IDs = person_IDs,
@@ -32,7 +57,16 @@ write_json(track_list, "track.json", pretty = T)
 ## add asyptomatic
 set.seed(1234)
 pop_df$asymptomatic <- runif(nrow(pop_df)) < 0.1
+
+## add stays home when infected
 pop_df$stays_home   <- runif(nrow(pop_df)) < 0.8
+head(pop_df)
+
+## and seed the initial infections
+pop_df$infected <- FALSE
+# rr <- runif(nrow(pop_df)) < 0.05
+rr <- pop_df$community_id == 1
+pop_df$infected[rr] <- TRUE
 head(pop_df)
 
 time_activity = data.table(
@@ -57,8 +91,9 @@ set.seed(123) # so certain random things always flip the same way
 
 # what do you want to track
 track <- jsonlite::read_json("track.json", simplifyVector = T)
+track
 
-n_days = 30
+n_days = 50
 
 LOCAL = T
 
@@ -68,87 +103,120 @@ if(LOCAL) {
     df_mat,
     ta_mat,
     hh_V     = 10,  # m^3
-    school_V = 100, # m^3
+    school_V = 10, # m^3
     work_V   = 100, # m^3
     comm_V   = 100, # m^3
     n_days = as.integer(n_days),
     personIDs_to_track = as.integer(track$person_IDs),
-    hhIDs_to_track = as.integer(track$household_IDs)
+    hhIDs_to_track = as.integer(track$household_IDs),
+    workIDs_to_track = as.integer(track$work_IDs),
+    schoolIDs_to_track = as.integer(track$school_IDs),
+    commIDs_to_track = as.integer(track$comm_IDs)
   )
 
-  make_plots <- function(out) {
-
-
-
-    library(ggplot2)
-    library(ggpubr)
-    library(patchwork)
-
-    get_rect_hours <- function(starttime, n_days) {
-      xx <- rep(24, n_days)
-      yy <- 0:(n_days - 1)
-      zz <- xx * yy
-      o <- rep(starttime, n_days)
-      return(o + zz)
-    }
-
-    make_bars <- function(starttime, endtime, xfill) {
-      return(annotate(geom = 'rect',
-               xmin = get_rect_hours(starttime, n_days),
-               xmax = get_rect_hours(endtime, n_days),
-               ymin= -Inf, ymax = Inf, fill = xfill))
-    }
+  make_tracked_plots <- function(out) {
 
     ## if track has household ID then plot this
-    hh_conc = data.table(out$hh)
-    names(hh_conc) = as.character(track$household_IDs)
-    hh_conc$hour = 1:nrow(hh_conc)
-    head(hh_conc)
-    hh_conc_melt = melt(hh_conc, id.vars = "hour")
+    hh_conc_melt <- get_melt(out$household_conc, track$household_IDs)
 
     p1 <- ggplot(hh_conc_melt) + theme_classic2() +
       make_bars(-4, 8, 'grey95') +
       make_bars(8, 9, 'lightyellow') +
       make_bars(9, 17, 'lavender') +
       make_bars(17, 20, 'lightyellow') +
-      geom_line(aes(x = hour, y = value, color = variable)) +
+      geom_line(aes(x = hour, y = value, color = variable),
+                show.legend = F) +
       ggtitle("household RSV concentration [mass/volume]")
 
-    person_conc = data.table(out$person_c)
-    names(person_conc) = as.character(track$person_IDs)
-    person_conc$hour = 1:nrow(person_conc)
-    head(person_conc)
-    person_conc_melt = melt(person_conc, id.vars = "hour")
-
     ## if track has person ID then plot this
+    person_conc_melt = get_melt(out$person_mass, track$person_IDs)
+
     p2 <- ggplot(person_conc_melt) + theme_classic2() +
       make_bars(-4, 8, 'grey95') +
       make_bars(8, 9, 'lightyellow') +
       make_bars(9, 17, 'lavender') +
       make_bars(17, 20, 'lightyellow') +
-      geom_line(aes(x = hour, y = value, color = variable)) +
+      geom_line(aes(x = hour, y = value, color = variable),
+                show.legend = F) +
       ggtitle("person RSV internal mass [mass]")
 
-    person_seir = data.table(out$person_seir)
-    names(person_seir) = as.character(track$person_IDs)
-    person_seir$hour = 1:nrow(person_seir)
-    head(person_seir)
-    tail(person_seir)
-    person_seir_melt = melt(person_seir, id.vars = "hour")
+    person_seir_melt = get_melt(out$person_seir, track$person_IDs)
 
     p3 <- ggplot(person_seir_melt) + theme_classic2() +
       make_bars(-4, 8, 'grey95') +
       make_bars(8, 9, 'lightyellow') +
       make_bars(9, 17, 'lavender') +
       make_bars(17, 20, 'lightyellow') +
-      geom_line(aes(x = hour, y = value, color = variable)) +
+      geom_line(aes(x = hour, y = value, color = variable),
+                show.legend = F) +
       ggtitle("person SEIR")
 
-    p1 / p2 / p3
+    #
+    work_melt <- get_melt(out$work_conc, track$work_IDs)
+    p4 <- ggplot(work_melt) + theme_classic2() +
+      make_bars(-4, 8, 'grey95') +
+      make_bars(8, 9, 'lightyellow') +
+      make_bars(9, 17, 'lavender') +
+      make_bars(17, 20, 'lightyellow') +
+      geom_line(aes(x = hour, y = value, color = variable),
+                show.legend = F) +
+      ggtitle("work RSV concentration [mass/volume]")
+
+    #
+    school_melt <- get_melt(out$school_conc, track$school_IDs)
+    p5 <- ggplot(school_melt) + theme_classic2() +
+      make_bars(-4, 8, 'grey95') +
+      make_bars(8, 9, 'lightyellow') +
+      make_bars(9, 17, 'lavender') +
+      make_bars(17, 20, 'lightyellow') +
+      geom_line(aes(x = hour, y = value, color = variable),
+                show.legend = F) +
+      ggtitle("school RSV concentration [mass/volume]")
+
+    #
+    community_melt <- get_melt(out$community_conc, track$comm_IDs)
+    p6 <- ggplot(community_melt) + theme_classic2() +
+      make_bars(-4, 8, 'grey95') +
+      make_bars(8, 9, 'lightyellow') +
+      make_bars(9, 17, 'lavender') +
+      make_bars(17, 20, 'lightyellow') +
+      geom_line(aes(x = hour, y = value, color = variable),
+                show.legend = F) +
+      ggtitle("community RSV concentration [mass/volume]")
+
+    #
+    p2 + p3 + p1 + p4 + p5 + p6 +
+      plot_layout(ncol = 2)
 
   }
 
-  make_plots(out)
+  make_diagnostic_plots <- function(out) {
+
+    ## if track has household ID then plot this
+    incidence_melt <- get_melt(out$incidence, 0:100)
+    incidence_melt$age <- as.integer(as.character(incidence_melt$variable))
+
+    p1 <- ggplot(incidence_melt) + theme_classic2() +
+      geom_tile(aes(x = hour, y = age, fill = value)) +
+      scale_fill_gradientn(colors = c('white', 'red', 'purple')) +
+      ggtitle("Incidence (new cases each hour)")
+
+    prevalence_melt <- get_melt(out$prevalence, 0:100)
+    prevalence_melt$age <- as.integer(as.character(prevalence_melt$variable))
+
+    p2 <- ggplot(prevalence_melt) + theme_classic2() +
+      geom_tile(aes(x = hour, y = age, fill = value)) +
+      scale_fill_gradientn(colors = c('white', 'red', 'purple')) +
+      ggtitle("Prevalence (total cases each hour)")
+
+    #
+    p1 + p2 +
+      plot_layout(ncol = 2)
+
+  }
+
+  make_tracked_plots(out)
+  make_diagnostic_plots(out) + geom_vline(xintercept = 250)
 
 }
 
