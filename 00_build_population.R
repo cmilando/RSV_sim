@@ -21,8 +21,6 @@ N <- 1e5
 #' ////////////////////////////////////////////////////////////////////////////
 #' ============================================================================
 
-library(data.table)
-
 # Census Vintage 2024 national age-sex estimates
 # url <- paste0(
 #   "https://www2.census.gov/programs-surveys/popest/datasets/",
@@ -67,6 +65,7 @@ hist(age_dist)
 
 # knowns
 # adding 1 because these can never be 0
+set.seed(1234)
 household_sizes <- rpois(N, 3) + 1  # comes from ACS
 work_sizes      <- rpois(N, 20) + 1   # comes from BLS
 school_sizes    <- rpois(N, 50) + 1  # comes from somewhere
@@ -153,6 +152,8 @@ oo <- set_ids_single_cpp(
   age0 = 20,
   age1 = 65
 )
+
+
 
 ##
 pop_df <- as.data.table(oo)

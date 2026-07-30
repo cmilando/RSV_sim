@@ -388,7 +388,7 @@ NumericMatrix set_ids_single_cpp(
   // set all 0 to NA
   for(int i = 0; i < df.nrow(); i++) {
      if(df(i, target_col) < 0) {
-       df(i, target_col) = ii;
+       df(i, target_col) = -999;
      }
   }
 
