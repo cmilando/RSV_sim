@@ -81,7 +81,7 @@ Rcpp::List get_ids_cpp(
 
     if (df(i, age_col) >= age_lower &&
         df(i, age_col) <= age_upper &&
-        df(i, target_col) == 0.0) {
+        df(i, target_col) < 0.0) {
       candidate_rows.push_back(i);
     }
   }
@@ -144,7 +144,7 @@ NumericMatrix set_ids_cpp(
 
   // intiliaze
   bool continue_loop = true;
-  int ii = 1;
+  int ii = 0;
 
   // while loop
   while (continue_loop) {
@@ -154,7 +154,7 @@ NumericMatrix set_ids_cpp(
       Rcpp::Rcout << ii << "\t";
 
     // get this total group size
-    int total_grp_size = vec[ii - 1];
+    int total_grp_size = vec[ii];
 
     // and now each individual group size
     int grp1_size = std::floor(p1 * total_grp_size);
@@ -232,7 +232,7 @@ NumericMatrix set_ids_cpp(
 
         for (int r = 0; r < df.nrow(); r++) {
 
-          if (df(r, target_col) == 0) {
+          if (df(r, target_col) < 0) {
             done = false;
             break;
           }
@@ -266,7 +266,7 @@ NumericMatrix set_ids_cpp(
   // find the empty rows
   for (int i = 0; i < df.nrow(); i++) {
 
-    if (df(i, target_col) == 0)
+    if (df(i, target_col) < 0)
       rr.push_back(i);
 
   }
@@ -350,7 +350,7 @@ NumericMatrix set_ids_single_cpp(
 
   // intiliaze
   bool continue_loop = true;
-  int ii = 1;
+  int ii = 0;
 
   // while loop
   while (continue_loop) {
@@ -360,7 +360,7 @@ NumericMatrix set_ids_single_cpp(
       Rcpp::Rcout << ii << "\t";
 
     // get this total group size
-    int total_grp_size = vec[ii - 1];
+    int total_grp_size = vec[ii];
 
     // get the rows to select
     List out1 = get_ids_cpp(df, total_grp_size, age_col,
@@ -381,19 +381,19 @@ NumericMatrix set_ids_single_cpp(
       continue_loop = false;
     }
 
-    ii = ii + 1;
+    ii++;
 
   }
 
   // set all 0 to NA
-  // for(int i = 0; i < df.nrow(); i++) {
-  //   if(df(i, target_col) == 0) {
-  //     df(i, target_col) = NA_REAL;
-  //   }
-  // }
+  for(int i = 0; i < df.nrow(); i++) {
+     if(df(i, target_col) < 0) {
+       df(i, target_col) = ii;
+     }
+  }
 
   // cleanup
-  Rcpp::Rcout << "Number of groups:" << ii - 1  <<"\n";
+  Rcpp::Rcout << "Number of groups:" << ii  <<"\n";
 
   return df;
 }

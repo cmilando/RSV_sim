@@ -10,9 +10,7 @@ library(Rcpp)
 # get files
 sourceCpp("set_ids.cpp")
 
-# some basic tests
-intv = as.integer(1:10)
-ransam_cpp(intv, 9)
+ransam_cpp(1:10, 3)
 
 # how large is the population
 N <- 1e5
@@ -84,7 +82,7 @@ school_sizes    <- rpois(N, 50) + 1  # comes from somewhere
 # unknown
 # this is just used to create the contact matrix
 # we'll solve for this next
-community_size_true <- rpois(N, 50)
+community_size_true <- rpois(N, 50) + 1
 stopifnot(all(community_size_true > 0))
 
 # now create your population dataset
@@ -92,10 +90,10 @@ stopifnot(all(community_size_true > 0))
 reset_pop_df <- function() {
   data.table(person_id = (0:(N-1)),
              age = round(age_dist),
-             household_id = numeric(N),
-             work_id = numeric(N),
-             school_id = numeric(N),
-             community_id = numeric(N))
+             household_id = numeric(N) - 1,
+             work_id = numeric(N) - 1,
+             school_id = numeric(N) - 1,
+             community_id = numeric(N) - 1)
 }
 
 pop_df <- reset_pop_df()
@@ -143,7 +141,7 @@ oo <- set_ids_cpp(
 
 pop_df <- as.data.table(oo)
 pop_df
-
+min(pop_df$household_id)
 # ***********************
 # WORK
 # probably makes sense to have an upper age limit here

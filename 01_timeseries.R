@@ -45,6 +45,7 @@ out <- get_timeseries(
 )
 
 conc = out$hh[1, ]
+conc
 hhdt = data.table(conc, hour = 0:(length(conc) - 1))
 
 library(ggplot2)
@@ -52,8 +53,6 @@ library(ggpubr)
 
 ggplot(hhdt) + theme_classic2() +
   geom_line(aes(x = hour, y = conc), color = 'blue') +
-  geom_vline(xintercept = c(7, 17, 23 + 8, 24 + 17),
-             linetype = 'dashed', linewidth = 0.25) +
   ggtitle("household RSV concentration")
 
 
