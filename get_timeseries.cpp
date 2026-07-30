@@ -32,6 +32,8 @@ struct Person {
   //     1 = Exposed
   //     2 = Infected
   //     3 = Recovered
+  int location;
+  int incidence_location;
 
   //
   int timesteps_for_incubation;
@@ -42,13 +44,13 @@ struct Person {
   // ---------------------
 
   // time-activity
-  int get_location(int hour) {
+  void set_location(int hour) {
 
     // ******************
     // if infected, theres an 80% chance you stay at home
     if(SEIR_status == 2) {
       if(stays_home == 1) {
-        return(0);
+        location = 0;
       }
     }
 
@@ -57,24 +59,22 @@ struct Person {
 
     // household
     if(hour < 8 | hour > 20) {
-      return(0);
+      location = 0;
     }
 
     // work / school
     if(hour > 9 & hour < 17) {
       if(work_id > 0) {
-        return(1);
+        location = 1;
       } else {
-        return(2);
+        location = 2;
       }
     }
 
     // community
     if(hour == 9 | hour == 17 | hour == 18 | hour == 19) {
-      return(3);
+      location = 3;
     }
-
-    return(-1);
 
   }
 
@@ -95,8 +95,8 @@ struct Person {
     float age_float = (float) age;
 
     // imperfect adjustment for age but not terrible for now
-    // float inhalation_flux = base_inhalation_flux * age_float / 30.0; // m^3 / hr
-    float inhalation_flux = base_inhalation_flux;
+    float inhalation_flux = base_inhalation_flux * age_float / 30.0; // m^3 / hr
+    // float inhalation_flux = base_inhalation_flux;
 
     // if you are infected or recovered, you cannot increase
     if(SEIR_status == 2 | SEIR_status == 3) {
@@ -131,6 +131,11 @@ struct Person {
     // and update the internal mass
     internal_viral_mass = std::max<float>(0, internal_viral_mass + dmdt);
 
+    // set a lower threshold
+    if(internal_viral_mass < 0.01) {
+      internal_viral_mass = 0.0;
+    }
+
     // incident is only true if you turn incident this timestep
     is_incident = false;
 
@@ -155,6 +160,7 @@ struct Person {
         if(timesteps_for_incubation == 0) {
           SEIR_status = 2;
           is_incident = true; // the only time this occurs
+          incidence_location = location;
         }
       }
 
@@ -217,6 +223,8 @@ struct Person {
          bool is_incident_ = false,
          float internal_viral_mass_ = 0.0,
          int SEIR_status_ = 0,
+         int location_ = 0,
+         int incidence_location_ = -1,
          int timesteps_for_incubation_ = 24 * 2, // 24 hours * 2 days
          int timesteps_for_recovery_ = 24 * 3) // 24 hours * 2 days
     : id(id_),
@@ -230,6 +238,8 @@ struct Person {
       is_incident(is_incident_),
       internal_viral_mass(internal_viral_mass_),
       SEIR_status(SEIR_status_),
+      location(location_),
+      incidence_location(incidence_location_),
       timesteps_for_incubation(timesteps_for_incubation_),
       timesteps_for_recovery(timesteps_for_recovery_) {}
 };
@@ -295,7 +305,7 @@ void update_environment_agents(
   currE = 0;
   for(int pi = 0; pi < n_hh_members; pi++) {
     person_id = zone_members[pi];
-    if(people[person_id].get_location(hour_i) == this_zone) {
+    if(people[person_id].location == this_zone) {
       currE = currE + people[person_id].exhalation_mass_flux();
     }
   }
@@ -309,7 +319,7 @@ void update_environment_agents(
   // then update the status of each person
   for(int pi = 0; pi < n_hh_members; pi++) {
     person_id = zone_members[pi];
-    if(people[person_id].get_location(hour_i) == this_zone) {
+    if(people[person_id].location == this_zone) {
       people[person_id].update_interal_mass(zone_conc[zone_i]);
       // people[person_id].print_self();
     }
@@ -469,6 +479,10 @@ List get_timeseries(
   Rcpp::IntegerVector incidence_sum(n_ages);
   Rcpp::IntegerVector prevalence_sum(n_ages);
 
+  // incidence locations
+  Rcpp::IntegerMatrix incidence_location(n_ages, 4);
+  Rcpp::Rcout << incidence_location(0,0) << "\n";
+
   Rcpp::Rcout << "********************************"<< "\n";
   Rcpp::Rcout << "DAY: ";
 
@@ -487,6 +501,11 @@ List get_timeseries(
       for(int ni = 0; ni < n_ages; ni ++) {
         incidence_sum[ni] = 0;
         prevalence_sum[ni] = 0;
+      }
+
+      // update everyone's location
+      for(int pi = 0; pi < n_people; pi ++) {
+        people[pi].set_location(hour_i);
       }
 
       // ***********************
@@ -586,6 +605,13 @@ List get_timeseries(
     }
   }
 
+  // total the incidence locations
+  for(int pi = 0; pi < n_people; pi ++) {
+    if(people[pi].incidence_location >= 0) {
+      incidence_location(people[pi].age, people[pi].incidence_location)++;
+    }
+  }
+
   Rcpp::Rcout << "\n********************************"<< "\n";
   Rcpp::Rcout << "COMPLETE.\n";
 
@@ -597,7 +623,8 @@ List get_timeseries(
     _["work_conc"]      = ww_mat,
     _["community_conc"] = cc_mat,
     _["incidence"]      = incidence_mat,
-    _["prevalence"]     = prevalence_mat
+    _["prevalence"]     = prevalence_mat,
+    _["incidence_location"]      = incidence_location
   );
 
 }

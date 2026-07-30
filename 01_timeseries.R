@@ -19,11 +19,12 @@ make_bars <- function(starttime, endtime, xfill) {
                   ymin= -Inf, ymax = Inf, fill = xfill))
 }
 
-get_melt <- function(x, xnames) {
+get_melt <- function(x, xnames, xcol = 'hour', xoffset = 0) {
   x = data.table(x)
   names(x) = as.character(xnames)
-  x$hour = 1:nrow(x)
-  return(melt(x, id.vars = "hour"))
+  x$new_col_name_here = (1:nrow(x)) - xoffset
+  names(x)[ncol(x)] = xcol
+  return(melt(x, id.vars = xcol))
 }
 
 #' ============================================================================
@@ -98,21 +99,6 @@ n_days = 50
 LOCAL = T
 
 if(LOCAL) {
-
-  out <- get_timeseries(
-    df_mat,
-    ta_mat,
-    hh_V     = 10,  # m^3
-    school_V = 10, # m^3
-    work_V   = 100, # m^3
-    comm_V   = 100, # m^3
-    n_days = as.integer(n_days),
-    personIDs_to_track = as.integer(track$person_IDs),
-    hhIDs_to_track = as.integer(track$household_IDs),
-    workIDs_to_track = as.integer(track$work_IDs),
-    schoolIDs_to_track = as.integer(track$school_IDs),
-    commIDs_to_track = as.integer(track$comm_IDs)
-  )
 
   make_tracked_plots <- function(out) {
 
@@ -189,7 +175,6 @@ if(LOCAL) {
       plot_layout(ncol = 2)
 
   }
-
   make_diagnostic_plots <- function(out) {
 
     ## if track has household ID then plot this
@@ -209,14 +194,38 @@ if(LOCAL) {
       scale_fill_gradientn(colors = c('white', 'red', 'purple')) +
       ggtitle("Prevalence (total cases each hour)")
 
+    location_vec <- c('Household', 'Work', 'School', 'Community')
+    incid_location_melt <- get_melt(out$incidence_location, location_vec,
+                                    xcol = 'age', xoffset = 1)
+
+    p3 <- ggplot(incid_location_melt) + theme_classic2() +
+      geom_tile(aes(x = variable, y = age, fill = value)) +
+      ggtitle("Incidence location") +
+      scale_fill_viridis_c(option = "magma")
+
     #
-    p1 + p2 +
-      plot_layout(ncol = 2)
+    p1 + p2 + p3 +
+      plot_layout(ncol = 3)
 
   }
 
+  out <- get_timeseries(
+    df_mat,
+    ta_mat,
+    hh_V     = 10,  # m^3
+    school_V = 10, # m^3
+    work_V   = 100, # m^3
+    comm_V   = 100, # m^3
+    n_days = as.integer(n_days),
+    personIDs_to_track = as.integer(track$person_IDs),
+    hhIDs_to_track = as.integer(track$household_IDs),
+    workIDs_to_track = as.integer(track$work_IDs),
+    schoolIDs_to_track = as.integer(track$school_IDs),
+    commIDs_to_track = as.integer(track$comm_IDs)
+  )
+
   make_tracked_plots(out)
-  make_diagnostic_plots(out) + geom_vline(xintercept = 250)
+  make_diagnostic_plots(out)
 
 }
 
