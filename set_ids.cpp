@@ -335,7 +335,7 @@ NumericMatrix set_ids_cpp(
 }
 
 //   !--------------------------------------------------------------------------
-//   ! Set ids - two group
+//   ! Set ids - one group
 //   !--------------------------------------------------------------------------
 
 // [[Rcpp::export]]
@@ -363,8 +363,9 @@ NumericMatrix set_ids_single_cpp(
     int total_grp_size = vec[ii];
 
     // get the rows to select
+    // *** DIFFERENT FROM ABOVE BECAUSE INCLUSIVE
     List out1 = get_ids_cpp(df, total_grp_size, age_col,
-                            age0, age1 - 1, target_col);
+                            age0, age1, target_col);
 
     // get the output from get_ids
     IntegerVector grp1_rows = out1["rows"];

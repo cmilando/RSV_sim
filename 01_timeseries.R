@@ -197,9 +197,12 @@ if(LOCAL) {
     location_vec <- c('Household', 'Work', 'School', 'Community')
     incid_location_melt <- get_melt(out$incidence_location, location_vec,
                                     xcol = 'age', xoffset = 1)
+    rr <- which(incid_location_melt$value == 0)
+    incid_location_melt$value[rr] <- NA
+    names(incid_location_melt)[2] = 'location'
 
     p3 <- ggplot(incid_location_melt) + theme_classic2() +
-      geom_tile(aes(x = variable, y = age, fill = value)) +
+      geom_tile(aes(x = location, y = age, fill = value)) +
       ggtitle("Incidence location") +
       scale_fill_viridis_c(option = "magma")
 
@@ -213,7 +216,7 @@ if(LOCAL) {
     df_mat,
     ta_mat,
     hh_V     = 10,  # m^3
-    school_V = 10, # m^3
+    school_V = 100, # m^3
     work_V   = 100, # m^3
     comm_V   = 100, # m^3
     n_days = as.integer(n_days),

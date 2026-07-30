@@ -92,10 +92,14 @@ struct Person {
     // 0.45 * 12 = 5.4 L / min = 0.324 m3/hr
     // BUT THIS WILL CHANGE WITH AGE
     float base_inhalation_flux = 0.324; // m^3 / hr
-    float age_float = (float) age;
+    float age_adjustment = (float) age;
+
+    // setting a threshold here
+    // this keeps it so that its always positive and between 0.1 and 30
+    age_adjustment = std::min<float>(1.0, std::max<float>(0.2, age_adjustment/30.0));
 
     // imperfect adjustment for age but not terrible for now
-    float inhalation_flux = base_inhalation_flux * age_float / 30.0; // m^3 / hr
+    float inhalation_flux = base_inhalation_flux * age_adjustment; // m^3 / hr
     // float inhalation_flux = base_inhalation_flux;
 
     // if you are infected or recovered, you cannot increase
@@ -481,7 +485,6 @@ List get_timeseries(
 
   // incidence locations
   Rcpp::IntegerMatrix incidence_location(n_ages, 4);
-  Rcpp::Rcout << incidence_location(0,0) << "\n";
 
   Rcpp::Rcout << "********************************"<< "\n";
   Rcpp::Rcout << "DAY: ";

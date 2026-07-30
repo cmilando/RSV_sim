@@ -134,7 +134,7 @@ oo <- set_ids_cpp(
   p1 = 0.5,
   p2 = 0.5,
   age0 = 0,
-  age1 = 20,
+  age1 = 20, # not included in the first group, so this means 0-19, 20-100
   age2 = 100
 )
 
@@ -150,7 +150,7 @@ oo <- set_ids_single_cpp(
   age_col = as.integer(2 - 1),
   target_col = as.integer(4 - 1),
   age0 = 20,
-  age1 = 65
+  age1 = 64
 )
 
 
@@ -167,7 +167,7 @@ oo <- set_ids_single_cpp(
    age_col = as.integer(2 - 1),
    target_col = as.integer(5 - 1),
    age0 = 0,
-   age1 = 20
+   age1 = 19
 )
 
 ##
@@ -183,13 +183,18 @@ oo <- set_ids_single_cpp(
   age_col = as.integer(2 - 1),
   target_col = as.integer(6 - 1),
   age0 = 0,
-  age1 = 100
+  age1 = 100 ## this is now included
 )
 
 ##
 pop_df <- as.data.table(oo)
 pop_df
 table(pop_df$community_id)
+
+# checks
+subset(pop_df, age == 100) # should just have community
+subset(pop_df, age == 20)  # should have work and not school
+subset(pop_df, age == 19)  # should have school and not work
 
 saveRDS(pop_df, "demo_pop.RDS")
 
