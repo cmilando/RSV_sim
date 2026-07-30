@@ -1,12 +1,15 @@
 #include <Rcpp.h>
 #include <array>
 #include <vector>
+#include <random>
 
 using namespace Rcpp;
 
 // **************************************************************************//
 struct Person {
 
+  // ---------------------
+  // CONSTANTS
   // ---------------------
   // these need to be in order in the constructor below
   // Personal identifies
@@ -21,18 +24,31 @@ struct Person {
 
   //
   bool asymptomatic;
-  float internal_viral_mass; // in mass,
+  bool stays_home;
+  float internal_viral_mass; // in #,
   int SEIR_status;
+  //     0 = Susceptible
+  //     1 = Exposed
+  //     2 = Infected
+  //     3 = Recovered
 
+  //
+  int timesteps_for_incubation;
+  int timesteps_for_recovery;
+
+  // ---------------------
+  // METHODS
   // ---------------------
 
   // time-activity
   int get_location(int hour) {
 
     // ******************
-    // if infected stay at home
+    // if infected, theres an 80% chance you stay at home
     if(SEIR_status == 2) {
-       return(0);
+      if(stays_home == 1) {
+        return(0);
+      }
     }
 
     // ******************
@@ -70,6 +86,7 @@ struct Person {
     // b = 1/10;              % min/breath,
     // vol_b = 0.5/1000;      % m^3, volume of air breathed in
     float src;
+
     // ref https://pmc.ncbi.nlm.nih.gov/articles/PMC8672270/
     // 0.45 * 12 = 5.4 L / min = 0.324 m3/hr
     // BUT THIS WILL CHANGE WITH AGE
@@ -112,20 +129,41 @@ struct Person {
     // and update the concentration
     internal_viral_mass = std::max<float>(0, internal_viral_mass + dmdt);
 
-    // as a result of internal mass flux, update SEIR status
-    if(internal_viral_mass == 0.0) {
-      if(viral_decay == recovered_viral_decay) {
-        SEIR_status = 3;
-      } else {
+    // now update SEIR status
+    if(SEIR_status == 0) {
+      // susceptible -> exposed
+      if(internal_viral_mass > 0) {
+        SEIR_status = 1;
+      }
+
+    } else if(SEIR_status == 1) {
+      // exposed -> susceptible
+      if(internal_viral_mass == 0.0) {
         SEIR_status = 0;
       }
-    } else if(internal_viral_mass > 0 & internal_viral_mass < 100) {
-      SEIR_status = 1;
-    } else if(internal_viral_mass >= 100) {
-      SEIR_status = 2;
+
+      // exposed -> infected
+      // once you cross some threshold of exposure, you are on the pathway
+      // towards being infected, so start counting down
+      if(internal_viral_mass > 100.0) {
+        timesteps_for_incubation--;
+        if(timesteps_for_incubation == 0) {
+          SEIR_status = 2;
+        }
+      }
+
+    } else if(SEIR_status == 2) {
+      // infected -> recovered
+      timesteps_for_recovery--;
+      if(timesteps_for_recovery == 0) {
+        SEIR_status = 3;
+      }
+
+    } else if(SEIR_status == 3) {
+      //
+
     } else {
       Rcpp::stop("ERROR");
-      SEIR_status = -1;
     }
 
   }
@@ -169,8 +207,11 @@ struct Person {
          int school_,
          int community_,
          bool asymptomatic_,
+         bool stays_home_,
          float internal_viral_mass_ = 0.0,
-         int SEIR_status_ = 0)
+         int SEIR_status_ = 0,
+         int timesteps_for_incubation_ = 24 * 2, // 24 hours * 2 days
+         int timesteps_for_recovery_ = 24 * 3) // 24 hours * 2 days
     : id(id_),
       age(age_),
       household_id(hh_),
@@ -178,8 +219,11 @@ struct Person {
       school_id(school_),
       community_id(community_),
       asymptomatic(asymptomatic_),
+      stays_home(stays_home_),
       internal_viral_mass(internal_viral_mass_),
-      SEIR_status(SEIR_status_) {}
+      SEIR_status(SEIR_status_),
+      timesteps_for_incubation(timesteps_for_incubation_),
+      timesteps_for_recovery(timesteps_for_recovery_) {}
 };
 
 
@@ -189,14 +233,12 @@ List get_timeseries(
     IntegerMatrix df,
     IntegerMatrix time_activity,
     int n_days,
-    int max_hh,
-    int max_work,
-    int max_school,
-    int max_comm,
     float hh_V,
     float work_V,
     float school_V,
-    float comm_V
+    float comm_V,
+    IntegerVector personIDs_to_track,
+    IntegerVector hhIDs_to_track
 ) {
 
   Rcpp::Rcout << "Initialize\n";
@@ -205,16 +247,36 @@ List get_timeseries(
   const int n_hours_per_day = 24;
   const int n_timesteps = n_hours_per_day * n_days;
 
+  const int max_hh = Rcpp::max(df(_, 2));
+  const int max_work = Rcpp::max(df(_, 3));
+  const int max_school = Rcpp::max(df(_, 4));
+  const int max_comm = Rcpp::max(df(_, 5));
+
+  const int ntrack_people = personIDs_to_track.size();
+  const int ntrack_hh = hhIDs_to_track.size();
+
   // ----------------------------------------------
   // **** ENVIRONMENT CONCENETRATION MATRICES *****
   // ----------------------------------------------
-  Rcpp::Rcout << "Concentration matrices\n";
+  Rcpp::Rcout << "Environment Concentrations \n";
   // get matrices for concentrations in each environment and time
   // rearranging this so the largest dimension is the rows
-  Rcpp::NumericMatrix hh_mat(max_hh, n_timesteps);
-  Rcpp::NumericMatrix ww_mat(max_work, n_timesteps);
-  Rcpp::NumericMatrix ss_mat(max_school, n_timesteps);
-  Rcpp::NumericMatrix cc_mat(max_comm, n_timesteps);
+  std::vector<float> hh_conc(max_hh);
+  std::vector<float> ww_conc(max_work);
+  std::vector<float> ss_conc(max_school);
+  std::vector<float> cc_conc(max_comm);
+
+  Rcpp::Rcout << hh_conc[0] << "\n";
+
+  // ----------------------------------------------
+  // **** ENVIRONMENT CONCENETRATION MATRICES *****
+  // ----------------------------------------------
+  Rcpp::Rcout << "Track matrices\n";
+  // get matrices for concentrations in each environment and time
+  // rearranging this so the largest dimension is the rows
+  Rcpp::NumericMatrix person_mat(n_timesteps, ntrack_people);
+  Rcpp::NumericMatrix seir_mat(n_timesteps, ntrack_people);
+  Rcpp::NumericMatrix hh_mat(n_timesteps, ntrack_hh);
 
   // ----------------------------------------------
   // **** ENVIRONMENT LOOKUP TABLES *****
@@ -222,25 +284,21 @@ List get_timeseries(
   // build the lookup tables
   Rcpp::Rcout << "Lookup tables\n";
 
+  // lists of vectors
   std::vector<std::vector<int>> hh_lookup(max_hh + 1);
   std::vector<std::vector<int>> ww_lookup(max_work + 1);
   std::vector<std::vector<int>> ss_lookup(max_school + 1);
   std::vector<std::vector<int>> cc_lookup(max_comm + 1);
 
   // use pointers so you don't make a copy of these
-  const int* hh_id  = &df(0, 2);
-  const int* wk_id  = &df(0, 3);
-  const int* ss_id = &df(0, 4);
-  const int* cc_id = &df(0, 5);
-
   const int n_people = df.nrow();
 
   // only add if the ID is greater than 0
   for (int i = 0; i < n_people; ++i) {
-    if(hh_id[i] >= 0) hh_lookup[hh_id[i]].push_back(i);
-    if(wk_id[i] >= 0) ww_lookup[wk_id[i]].push_back(i);
-    if(ss_id[i] >= 0) ss_lookup[ss_id[i]].push_back(i);
-    if(cc_id[i] >= 0) cc_lookup[cc_id[i]].push_back(i);
+    if(df(i, 2) >= 0) hh_lookup[df(i, 2)].push_back(i);
+    if(df(i, 3) >= 0) ww_lookup[df(i, 3)].push_back(i);
+    if(df(i, 4) >= 0) ss_lookup[df(i, 4)].push_back(i);
+    if(df(i, 5) >= 0) cc_lookup[df(i, 5)].push_back(i);
   }
 
   // ----------------------------------------------
@@ -255,14 +313,18 @@ List get_timeseries(
     // what fraction of people are asymptomatic
     bool asymptomatic = (bool) df(i, 6) == 1;
 
+    // when you are sick do you stay home
+    bool stays_home = (bool) df(i, 7) == 1;
+
     people.emplace_back(
-      df(i, 0),    // ID
-      df(i, 1),    // age
-      df(i, 2),    // household_id
-      df(i, 3),    // work_id
-      df(i, 4),    // school_id
-      df(i, 5),    // community_id
-      asymptomatic // asymptomatic
+      df(i, 0),     // ID
+      df(i, 1),     // age
+      df(i, 2),     // household_id
+      df(i, 3),     // work_id
+      df(i, 4),     // school_id
+      df(i, 5),     // community_id
+      asymptomatic, // asymptomatic
+      stays_home    // stays_home
     );
   }
 
@@ -278,6 +340,7 @@ List get_timeseries(
     people[infect_id].print_self();
   }
   Rcpp::Rcout << "\n";
+
   // ----------------------------------------------
   // **** MAIN LOOP *****
   // ----------------------------------------------
@@ -318,13 +381,13 @@ List get_timeseries(
   float C;
   float currE;
   int person_id;
+  int hh_id;
 
   // loop
   for(int day_i = 0; day_i < n_days; day_i++) {
 
     Rcpp::Rcout << "********************************"<< "\n";
     Rcpp::Rcout << "\nDAY:  "<< day_i << "\n";
-
 
     for(int hour_i = 0; hour_i < n_hours_per_day; hour_i++) {
 
@@ -343,7 +406,7 @@ List get_timeseries(
         if(timestep == 0) {
           C = hh_zero;
         } else {
-          C = hh_mat(hh_i, timestep - 1);
+          C = hh_conc[hh_i];
         }
 
         // lets get the people in this household;
@@ -370,18 +433,29 @@ List get_timeseries(
         // Rcpp::Rcout << "("<< dcdt << ")\t";
 
         // augment and set the floor
-        hh_mat(hh_i, timestep) = std::max<float>(0.0, C + dcdt);
+        hh_conc[hh_i] = std::max<float>(0.0, C + dcdt);
 
         // then update the status of each person
         for(int pi = 0; pi < n_hh_members; pi++) {
           person_id = hh_members[pi];
           if(people[person_id].get_location(hour_i) == 0) {
-            people[person_id].update_interal_conc(hh_mat(hh_i, timestep));
+            people[person_id].update_interal_conc(hh_conc[hh_i]);
             people[person_id].print_self();
           }
         }
 
       } // end household loop
+
+      // now save the ones you are tracking
+      for(int ti = 0; ti < ntrack_people; ti ++) {
+        person_id = personIDs_to_track[ti];
+        person_mat(timestep, ti) = people[person_id].internal_viral_mass;
+        seir_mat(timestep, ti) = people[person_id].SEIR_status;
+      }
+      for(int ti = 0; ti < ntrack_hh; ti ++) {
+        hh_id = hhIDs_to_track[ti];
+        hh_mat(timestep, ti) = hh_conc[hh_id];
+      }
 
       // ITERATE
       timestep++;
@@ -392,7 +466,9 @@ List get_timeseries(
 
 
   return List::create(
-    _["hh"] = hh_mat
+    _["hh"] = hh_mat,
+    _["person_c"] = person_mat,
+    _["person_seir"] = seir_mat
   );
 
 }
