@@ -14,12 +14,18 @@ dim(pop_df)
 # set up some things to track
 # huh, they have both a work ID and school ID, thats .... incorrect ... ?
 # also seems like
-subset(pop_df, household_id == 1)
-person_IDs = subset(pop_df, household_id == 1)$person_id
-work_IDs = subset(pop_df, household_id == 1)$work_id
-school_IDs = subset(pop_df, household_id == 1)$work_id
+hh_ids <- c(0, 1)
+subset(pop_df, household_id %in% hh_ids)
+person_IDs = subset(pop_df, household_id %in% hh_ids)$person_id
+work_IDs = subset(pop_df, household_id %in% hh_ids)$work_id
+school_IDs = subset(pop_df, household_id %in% hh_ids)$school_id
+comm_IDs = subset(pop_df, household_id %in% hh_ids)$community_id
+
 track_list = list(person_IDs = person_IDs,
-                  household_IDs = 1)
+                  household_IDs = hh_ids,
+                  work_IDs = work_IDs,
+                  school_IDs = school_IDs,
+                  comm_IDs = comm_IDs)
 
 write_json(track_list, "track.json", pretty = T)
 
@@ -54,7 +60,7 @@ track <- jsonlite::read_json("track.json", simplifyVector = T)
 
 n_days = 30
 
-LOCAL = F
+LOCAL = T
 
 if(LOCAL) {
 
@@ -72,8 +78,7 @@ if(LOCAL) {
 
   make_plots <- function(out) {
 
-    conc = out$hh
-    hhdt = data.table(conc, hour = 0:(length(conc) - 1))
+
 
     library(ggplot2)
     library(ggpubr)
@@ -95,13 +100,19 @@ if(LOCAL) {
     }
 
     ## if track has household ID then plot this
-    p1 <- ggplot(hhdt) + theme_classic2() +
+    hh_conc = data.table(out$hh)
+    names(hh_conc) = as.character(track$household_IDs)
+    hh_conc$hour = 1:nrow(hh_conc)
+    head(hh_conc)
+    hh_conc_melt = melt(hh_conc, id.vars = "hour")
+
+    p1 <- ggplot(hh_conc_melt) + theme_classic2() +
       make_bars(-4, 8, 'grey95') +
       make_bars(8, 9, 'lightyellow') +
       make_bars(9, 17, 'lavender') +
       make_bars(17, 20, 'lightyellow') +
-      geom_line(aes(x = hour, y = conc), color = 'blue') +
-      ggtitle("household RSV concentration")
+      geom_line(aes(x = hour, y = value, color = variable)) +
+      ggtitle("household RSV concentration [mass/volume]")
 
     person_conc = data.table(out$person_c)
     names(person_conc) = as.character(track$person_IDs)
@@ -116,7 +127,7 @@ if(LOCAL) {
       make_bars(9, 17, 'lavender') +
       make_bars(17, 20, 'lightyellow') +
       geom_line(aes(x = hour, y = value, color = variable)) +
-      ggtitle("person RSV internal mass")
+      ggtitle("person RSV internal mass [mass]")
 
     person_seir = data.table(out$person_seir)
     names(person_seir) = as.character(track$person_IDs)
