@@ -40,7 +40,7 @@ dim(pop_df)
 # set up some things to track
 # huh, they have both a work ID and school ID, thats .... incorrect ... ?
 # also seems like
-hh_ids <- c(0, 1, 5)
+hh_ids <- c(1)
 subset(pop_df, household_id %in% hh_ids)
 person_IDs = subset(pop_df, household_id %in% hh_ids)$person_id
 work_IDs = subset(pop_df, household_id %in% hh_ids & work_id != -999)$work_id
@@ -231,7 +231,7 @@ if(LOCAL) {
     commIDs_to_track = as.integer(track$comm_IDs)
   )
 
-  make_tracked_plots(out)
+  make_tracked_plots(out) + coord_cartesian(xlim = c(250, 500))
   make_diagnostic_plots(out)
 
 }

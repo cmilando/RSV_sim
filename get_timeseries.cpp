@@ -107,15 +107,16 @@ struct Person {
     // sink is just the exponential internal decay rate, [1/time]
     float sink;
     float viral_decay;
+    float baseline_immune_response = 0.05;
 
     if(SEIR_status == 0) {
       // Susceptible: no antibodies yet
-      viral_decay = 0.0;
+      viral_decay = baseline_immune_response;
     } else if(SEIR_status == 1) {
       // Exposed: no antibodies yet
       // TODO: if you don't set this to positive then there is no
       //       chance of someone returning to susceptible if they are exposed
-      viral_decay = 0.0;
+      viral_decay = baseline_immune_response;
     } else if(SEIR_status == 2) {
       // Infected: this determines recovery time
       //           but not really right ...
