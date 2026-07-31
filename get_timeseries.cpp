@@ -25,6 +25,7 @@ struct Person {
   //
   bool asymptomatic;
   bool stays_home;
+  const std::vector<int> baseline_time_activity;
   bool is_incident;
   float internal_viral_mass; // in #,
   int SEIR_status;
@@ -32,6 +33,7 @@ struct Person {
   //     1 = Exposed
   //     2 = Infected
   //     3 = Recovered
+
   int location;
   int incidence_location;
 
@@ -46,91 +48,94 @@ struct Person {
   // time-activity
   void set_location(int hour) {
 
+    // Locations are:
+    // 0 : Home
+    // 1 : Work
+    // 2 : School
+    // 3 : Community
+
     // ******************
-    // if infected, theres an 80% chance you stay at home
-    if(SEIR_status == 2) {
+    // if infected and symptomatic,
+    // theres an X% chance you stay at home
+    if(SEIR_status == 2 & asymptomatic == false) {
       if(stays_home == 1) {
         location = 0;
       }
     }
 
     // ******************
-    // otherwise
-
-    // household
-    if(hour < 8 | hour > 20) {
-      location = 0;
-    }
-
-    // work / school
-    if(hour > 9 & hour < 17) {
-      if(work_id > 0) {
-        location = 1;
-      } else {
-        location = 2;
-      }
-    }
-
-    // community
-    if(hour == 9 | hour == 17 | hour == 18 | hour == 19) {
-      location = 3;
-    }
+    // otherwise read from the baseline time-activity
+    location = baseline_time_activity[hour];
 
   }
 
   // method to update your internal viral load
-  void update_interal_mass(float C) {
+  void update_internal_viral_mass(float inhaledC) {
 
-    // probably need to look this up but for now --
-    // Source is what you are breathing in until you are infected
-    // and then its nothing
-    // b = 1/10;              % min/breath,
-    // vol_b = 0.5/1000;      % m^3, volume of air breathed in
+    // ********************************************************************
+    // Source for internal viral mass is inhalation and exponential growth
+    // units: [mass / time]
+    // ********************************************************************
     float src;
-
     // ref https://pmc.ncbi.nlm.nih.gov/articles/PMC8672270/
     // 0.45 * 12 = 5.4 L / min = 0.324 m3/hr
-    // BUT THIS WILL CHANGE WITH AGE
+    // Source is what you are breathing in until you are infected
     float base_inhalation_flux = 0.324; // m^3 / hr
-    float age_adjustment = (float) age;
 
+    // BUT THIS WILL CHANGE WITH AGE
     // setting a threshold here
     // this keeps it so that its always positive and between 0.1 and 30
+    float age_adjustment = (float) age;
     age_adjustment = std::min<float>(1.0, std::max<float>(0.2, age_adjustment/30.0));
-
     // imperfect adjustment for age but not terrible for now
     float inhalation_flux = base_inhalation_flux * age_adjustment; // m^3 / hr
     // float inhalation_flux = base_inhalation_flux;
 
-    // if you are infected or recovered, you cannot increase
-    if(SEIR_status == 2 | SEIR_status == 3) {
-      src = 0.0;
-    } else {
-      // src [mass/time] = C [mass/volume] * inhalation_flux [volume/time]
-      src = C * inhalation_flux;
-    }
+    // In addition exponential growth
+    float r_growth_rate = 0.05; // the growth rate per timestep
+    float new_mass = internal_viral_mass * r_growth_rate;
 
-    // sink is just the decay rate, [1/time]
-    float susceptible_viral_decay = 0.0;    // no antibodies yet
-    float exposed_viral_decay     = 0.0;    // no antibodies yet
-    float infected_viral_decay    = 0.15;    // this determines recovery time
-    float recovered_viral_decay   = 1000.0; // you have antibodies so
+    // src [mass/time] = inhaledC [mass/volume] * inhalation_flux [volume/time]
+    //                   + exponential growth of internal mass
+    src = inhaledC * inhalation_flux + new_mass;
+
+    // ********************************************************************
+    // Sink for internal viral mass is decay aka immunity building up
+    // but this only kicks in once you are infected
+    // units: [mass/time]
+    // ********************************************************************
+    // sink is just the exponential internal decay rate, [1/time]
+    float sink;
     float viral_decay;
 
     if(SEIR_status == 0) {
-      viral_decay = susceptible_viral_decay;
+      // Susceptible: no antibodies yet
+      viral_decay = 0.0;
     } else if(SEIR_status == 1) {
-      viral_decay = exposed_viral_decay;
+      // Exposed: no antibodies yet
+      // TODO: if you don't set this to positive then there is no
+      //       chance of someone returning to susceptible if they are exposed
+      viral_decay = 0.0;
     } else if(SEIR_status == 2) {
-      viral_decay = infected_viral_decay;
+      // Infected: this determines recovery time
+      //           but not really right ...
+      //           its confusing to switch a different mechanism here
+      viral_decay =  0.15;
     } else {
-      viral_decay = recovered_viral_decay;
+      // Recovered: you have antibodies so
+      viral_decay = 1000.0;
+      // TODO: everntually can wane this so you can get infected again
     }
 
+    sink = internal_viral_mass * viral_decay;
+
+    // ********************************************************************
+    // Change in mass
+    // ********************************************************************
     // ok now put it together
     // src = [mass/time]
     // sink = [mass/time]
-    float dmdt = src - internal_viral_mass * viral_decay;
+    float dmdt = src - sink;
 
     // and update the internal mass
     internal_viral_mass = std::max<float>(0, internal_viral_mass + dmdt);
@@ -142,6 +147,10 @@ struct Person {
 
     // incident is only true if you turn incident this timestep
     is_incident = false;
+
+    // ********************************************************************
+    // Natural history pathway
+    // ********************************************************************
 
     // now update SEIR status
     if(SEIR_status == 0) {
@@ -185,28 +194,25 @@ struct Person {
   }
 
   // get exhalation amount
-  float exhalation_mass_flux() {
-    // ref https://pmc.ncbi.nlm.nih.gov/articles/PMC8672270/
-    // 0.45 * 12 = 5.4 L / min = 0.324 m3/hr
-    // BUT THIS WILL CHANGE WITH AGE
-    // float exhalation_flux = 0.324; // m^3 / hr
+  float exhalation_viral_mass_flux() {
+    // The one-way transfer of mass back into the environment
+    // this is one-way, meaning that this does not impact your own mass
+    // and its this reason why we don't have to do RungaKutta, because
+    // this step does not impact the internal mass
 
-    // the units here get a litte messy
-    // but i guess you have to assume that your viral load is what you exhale
-    // each hour? ..... ..... .....
-
-    // maybe we can scale this down by some amount to reflect that you
-    // dont exhale copies of your entire mass flux every hour
-    // probably need to research this somewhat
+    // I think it makes sense to threshold this a little bit
+    // but i think this is done elsewhere
+    // I Think you should think about this more in descrete terms
     return internal_viral_mass / 12.0;
   }
 
-  // method
+  // infect
   void infect() {
     SEIR_status = 2;
     internal_viral_mass = 200;
   }
 
+  //  print slef
   void print_self() {
     Rcpp::Rcout << "Person ID# "<< id << ",";
     Rcpp::Rcout << "currentM: " <<  internal_viral_mass << ",";
@@ -224,6 +230,7 @@ struct Person {
          int community_,
          bool asymptomatic_,
          bool stays_home_,
+         const std::vector<int> baseline_time_activity_,
          bool is_incident_ = false,
          float internal_viral_mass_ = 0.0,
          int SEIR_status_ = 0,
@@ -239,6 +246,7 @@ struct Person {
       community_id(community_),
       asymptomatic(asymptomatic_),
       stays_home(stays_home_),
+      baseline_time_activity(baseline_time_activity_),
       is_incident(is_incident_),
       internal_viral_mass(internal_viral_mass_),
       SEIR_status(SEIR_status_),
@@ -310,7 +318,7 @@ void update_environment_agents(
   for(int pi = 0; pi < n_hh_members; pi++) {
     person_id = zone_members[pi];
     if(people[person_id].location == this_zone) {
-      currE = currE + people[person_id].exhalation_mass_flux();
+      currE = currE + people[person_id].exhalation_viral_mass_flux();
     }
   }
 
@@ -324,10 +332,10 @@ void update_environment_agents(
   for(int pi = 0; pi < n_hh_members; pi++) {
     person_id = zone_members[pi];
     if(people[person_id].location == this_zone) {
-      people[person_id].update_interal_mass(zone_conc[zone_i]);
-      // people[person_id].print_self();
+      people[person_id].update_internal_viral_mass(zone_conc[zone_i]);
     }
   }
+
 }
 
 // **************************************************************************//
@@ -437,6 +445,16 @@ List get_timeseries(
     // when you are sick do you stay home
     bool stays_home = (bool) df(i, 7) == 1;
 
+    // pick a time-activity pattern
+    std::vector<int> ta(24);
+    for(int hi = 0; hi < 23; hi++) {
+      if(df(i, 3) > -1) {
+        ta[hi] = time_activity(hi, 1);
+      } else {
+        ta[hi] = time_activity(hi, 2);
+      }
+    }
+
     people.emplace_back(
       df(i, 0),     // ID
       df(i, 1),     // age
@@ -445,7 +463,8 @@ List get_timeseries(
       df(i, 4),     // school_id
       df(i, 5),     // community_id
       asymptomatic, // asymptomatic
-      stays_home    // stays_home
+      stays_home,   // stays_home
+      ta            // time-activity matrix
     );
   }
 

@@ -72,9 +72,12 @@ head(pop_df)
 
 time_activity = data.table(
   hour = 0:23,
-  household = rep(0, 24),
-  work_school = rep(0, 24),
-  community = rep(0, 24))
+  work_location = c(0, 0, 0, 0, 0, 0, 0, 0,
+               3, 1, 1, 1, 1, 1, 1, 1,
+               1, 3, 3, 3, 0, 0, 0, 0),
+  school_location = c(0, 0, 0, 0, 0, 0, 0, 0,
+                    3, 2, 2, 2, 2, 2, 2, 2,
+                    2, 3, 3, 3, 0, 0, 0, 0))
 
 df_mat <- as.matrix(pop_df)
 mode(df_mat) <- 'integer'
@@ -83,6 +86,7 @@ head(df_mat)
 ta_mat <- as.matrix(time_activity)
 mode(ta_mat) <- 'integer'
 head(ta_mat)
+ta_mat
 
 Rcpp::sourceCpp("get_timeseries.cpp")
 set.seed(123) # so certain random things always flip the same way
@@ -216,7 +220,7 @@ if(LOCAL) {
     df_mat,
     ta_mat,
     hh_V     = 10,  # m^3
-    school_V = 100, # m^3
+    school_V = 10, # m^3
     work_V   = 100, # m^3
     comm_V   = 100, # m^3
     n_days = as.integer(n_days),
