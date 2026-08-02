@@ -3,27 +3,13 @@ library(jsonlite)
 library(data.table)
 library(ggplot2)
 library(ggpubr)
+library(bslib)
 
 #----------------------------------------------------------
 # Helper plotting functions
 #----------------------------------------------------------
 
 source("01_timeseries.R")
-
-get_rect_hours <- function(starttime, n_days) {
-  starttime + 24 * (0:(n_days - 1))
-}
-
-make_bars <- function(starttime, endtime, fill) {
-  annotate(
-    "rect",
-    xmin = get_rect_hours(starttime, n_days),
-    xmax = get_rect_hours(endtime, n_days),
-    ymin = -Inf,
-    ymax = Inf,
-    fill = fill
-  )
-}
 
 #----------------------------------------------------------
 # UI
@@ -32,12 +18,30 @@ make_bars <- function(starttime, endtime, fill) {
 ui <- fluidPage(
 
   # max width
-  style = "max-width: 700px;",
+  style = "max-width: 1000px;",
 
   titlePanel("RSV Tracking"),
 
-  actionButton("run", "Run model"),
+  shiny::inputPanel(
 
+    ##
+    actionButton("run", "Run model"),
+
+    ##
+    numericInput(
+      "n_days", "N days", 50, min = 1, max = 100, step = 1
+    ),
+
+    ##
+    uiOutput("xzoom_ui"),
+
+    ##
+    numericInput(
+      "transProb", "Transmission probability",
+      value = 0.25, min = 0, max = 1
+    )
+
+  ),
   br(),
   br(),
 
@@ -50,20 +54,30 @@ ui <- fluidPage(
 
 server <- function(input, output, session){
 
-  results <- eventReactive(input$run, {
+  output$xzoom_ui <- renderUI({
+    sliderInput("xzoom", "X range",
+                min = 0, max = input$n_days * 24,
+                value = c(0, input$n_days * 12))
+  })
 
-    track <- read_json("track.json", simplifyVector = TRUE)
+  results <- eventReactive(input$run, {
 
     out <- get_timeseries(
       df_mat,
       ta_mat,
-      hh_V     = 10,
-      school_V = 100,
-      work_V   = 100,
-      comm_V   = 100,
-      n_days = as.integer(n_days),
+      n_days = as.integer(input$n_days),
+      ## ** variables for calibration
+      transmission_probability = input$transProb,
+      ##
+      virus_decay_days = as.integer(3),
+      incubation_days = as.integer(3),
+      recovery_days = as.integer(3),
+      ##
       personIDs_to_track = as.integer(track$person_IDs),
-      hhIDs_to_track = as.integer(track$household_IDs)
+      hhIDs_to_track = as.integer(track$household_IDs),
+      workIDs_to_track = as.integer(track$work_IDs),
+      schoolIDs_to_track = as.integer(track$school_IDs),
+      commIDs_to_track = as.integer(track$comm_IDs)
     )
 
     list(
@@ -85,110 +99,47 @@ server <- function(input, output, session){
 
     tabs <- list()
 
-    if (length(tr$household_IDs) > 0) {
-      tabs[[length(tabs) + 1]] <- tabPanel(
-        "Household",
-        plotOutput("householdPlot")
-      )
-    }
+    tabs[[length(tabs) + 1]] <- tabPanel(
+      "Tracked plots",
+      plotOutput("trackedPlots")
+    )
 
-    if (length(tr$person_IDs) > 0) {
-      tabs[[length(tabs) + 1]] <- tabPanel(
-        "Person concentration",
-        plotOutput("personConcPlot")
-      )
-
-      tabs[[length(tabs) + 1]] <- tabPanel(
-        "Person SEIR",
-        plotOutput("personSEIRPlot")
-      )
-    }
+    tabs[[length(tabs) + 1]] <- tabPanel(
+      "Diagnostic plots",
+      plotOutput("diagnosticPlots")
+    )
 
     do.call(tabsetPanel, tabs)
 
   })
 
   #--------------------------------------------------------
-  # Household plot
+  # trackedPlots
   #--------------------------------------------------------
 
-  output$householdPlot <- renderPlot({
+  output$trackedPlots <- renderPlot({
 
     req(results())
 
-    conc <- results()$out$hh
+    out <- results()$out
 
-    hhdt <- data.table(
-      hour = 0:(length(conc)-1),
-      conc = conc
-    )
+    make_tracked_plots(out, xzoom = c(input$xzoom[1], input$xzoom[2]))
 
-    ggplot(hhdt) +
-      theme_classic2() +
-      make_bars(-4,8,"grey95") +
-      make_bars(8,9,"lightyellow") +
-      make_bars(9,17,"lavender") +
-      make_bars(17,20,"lightyellow") +
-      geom_line(aes(hour, conc), colour="blue") +
-      ggtitle("Household RSV concentration")
-
-  }, res = 92)
+  }, res = 92, height = 1600)
 
   #--------------------------------------------------------
-  # Person concentration
+  # diagnosticPlots
   #--------------------------------------------------------
 
-  output$personConcPlot <- renderPlot({
+  output$diagnosticPlots <- renderPlot({
 
     req(results())
 
-    track <- results()$track
+    out <- results()$out
 
-    person_conc <- data.table(results()$out$person_c)
-    names(person_conc) <- as.character(track$person_IDs)
+    make_diagnostic_plots(out, xzoom = c(input$xzoom[1], input$xzoom[2]))
 
-    person_conc$hour <- seq_len(nrow(person_conc))
-
-    person_conc <- melt(person_conc, id.vars="hour")
-
-    ggplot(person_conc) +
-      theme_classic2() +
-      make_bars(-4,8,"grey95") +
-      make_bars(8,9,"lightyellow") +
-      make_bars(9,17,"lavender") +
-      make_bars(17,20,"lightyellow") +
-      geom_line(aes(hour, value, colour=variable)) +
-      ggtitle("Person RSV concentration")
-
-  }, res = 92)
-
-  #--------------------------------------------------------
-  # Person SEIR
-  #--------------------------------------------------------
-
-  output$personSEIRPlot <- renderPlot({
-
-    req(results())
-
-    track <- results()$track
-
-    person_seir <- data.table(results()$out$person_seir)
-    names(person_seir) <- as.character(track$person_IDs)
-
-    person_seir$hour <- seq_len(nrow(person_seir))
-
-    person_seir <- melt(person_seir, id.vars="hour")
-
-    ggplot(person_seir) +
-      theme_classic2() +
-      make_bars(-4,8,"grey95") +
-      make_bars(8,9,"lightyellow") +
-      make_bars(9,17,"lavender") +
-      make_bars(17,20,"lightyellow") +
-      geom_line(aes(hour, value, colour=variable)) +
-      ggtitle("Person SEIR")
-
-  }, res = 92)
+  }, res = 92, height = 1000)
 
 }
 

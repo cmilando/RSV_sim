@@ -1,7 +1,7 @@
 {
-  "person_IDs": [2553, 48942, 52804, 60695],
+  "person_IDs": [31, 59, 75, 85],
   "household_IDs": [1],
-  "work_IDs": [2062],
-  "school_IDs": [114, 176],
-  "comm_IDs": [423, 1365, 1420, 1849]
+  "work_IDs": [1, 0],
+  "school_IDs": [0],
+  "comm_IDs": [0, 2]
 }
