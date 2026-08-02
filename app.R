@@ -4,48 +4,84 @@ library(data.table)
 library(ggplot2)
 library(ggpubr)
 library(bslib)
+library(svglite)
 
 #----------------------------------------------------------
 # Helper plotting functions
 #----------------------------------------------------------
 
 source("01_timeseries.R")
+Rcpp::sourceCpp("get_timeseries.cpp")
 
 #----------------------------------------------------------
 # UI
 #----------------------------------------------------------
 
-ui <- fluidPage(
+library(shiny)
+library(bslib)
 
-  # max width
-  style = "max-width: 1000px;",
+ui <- page_fluid(
 
-  titlePanel("RSV Tracking"),
-
-  shiny::inputPanel(
-
-    ##
-    actionButton("run", "Run model"),
-
-    ##
-    numericInput(
-      "n_days", "N days", 50, min = 1, max = 100, step = 1
-    ),
-
-    ##
-    uiOutput("xzoom_ui"),
-
-    ##
-    numericInput(
-      "transProb", "Transmission probability",
-      value = 0.25, min = 0, max = 1
-    )
-
+  theme = bs_theme(
+    version = 5,
+    bootswatch = "flatly"
   ),
-  br(),
-  br(),
 
-  uiOutput("tabs")
+  div(
+    style = "max-width: 1100px; margin: auto;",
+
+    h2("RSV Tracking"),
+    br(),
+
+    layout_sidebar(
+
+      sidebar = card(
+        card_header("Model Settings"),
+
+        numericInput(
+          "n_days",
+          "Simulation days",
+          value = 25,
+          min = 1,
+          max = 100,
+          step = 1
+        ),
+
+        uiOutput("xzoom_ui"),
+
+        numericInput(
+          "transProb",
+          "Transmission probability",
+          value = 0.00085,
+          min = 0,
+          max = 1,
+          step = 0.01
+        ),
+
+        numericInput(
+          "setSeed",
+          "Seed",
+          value = 123,
+          min = 1,
+          step = 1
+        ),
+
+        br(),
+
+        actionButton(
+          "run",
+          "Run model",
+          class = "btn-primary w-100"
+        )
+      ),
+
+      card(
+        card_body(
+          uiOutput("tabs")
+        )
+      )
+    )
+  )
 )
 
 #----------------------------------------------------------
@@ -57,10 +93,12 @@ server <- function(input, output, session){
   output$xzoom_ui <- renderUI({
     sliderInput("xzoom", "X range",
                 min = 0, max = input$n_days * 24,
-                value = c(0, input$n_days * 12))
+                value = c(0, input$n_days * 24))
   })
 
   results <- eventReactive(input$run, {
+
+    set.seed(input$setSeed)
 
     out <- get_timeseries(
       df_mat,
@@ -123,9 +161,10 @@ server <- function(input, output, session){
 
     out <- results()$out
 
-    make_tracked_plots(out, xzoom = c(input$xzoom[1], input$xzoom[2]))
+    make_tracked_plots(out, n_days = input$n_days,
+                       xzoom = c(input$xzoom[1], input$xzoom[2]))
 
-  }, res = 92, height = 1600)
+  }, height = 1400)
 
   #--------------------------------------------------------
   # diagnosticPlots
@@ -139,7 +178,7 @@ server <- function(input, output, session){
 
     make_diagnostic_plots(out, xzoom = c(input$xzoom[1], input$xzoom[2]))
 
-  }, res = 92, height = 1000)
+  }, height = 1000)
 
 }
 
