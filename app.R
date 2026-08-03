@@ -239,9 +239,9 @@ ui <- page_fluid(
         numericInput(
           "n_days",
           "Simulation days",
-          value = 100,
+          value = 25,
           min = 1,
-          max = 100,
+          max = 50,
           step = 1
         ),
 
@@ -250,7 +250,7 @@ ui <- page_fluid(
         numericInput(
           "transProb",
           "Transmission probability",
-          value = 0.00125,
+          value = 0.01,
           min = 0,
           max = 1,
           step = 0.01
