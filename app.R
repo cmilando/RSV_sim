@@ -250,7 +250,7 @@ ui <- page_fluid(
         numericInput(
           "transProb",
           "Transmission probability",
-          value = 0.01,
+          value = 0.012,
           min = 0,
           max = 1,
           step = 0.01
@@ -259,9 +259,9 @@ ui <- page_fluid(
         numericInput(
           "p_initInfect",
           "Percent initially infected",
-          value = 1,
+          value = 2,
           min = 0.1,
-          max = 50,
+          max = 5,
           step = 0.1
         ),
 
@@ -271,7 +271,7 @@ ui <- page_fluid(
           value = 10,
           min = 0.1,
           max = 50,
-          step = 0.1,width = "80%"
+          step = 0.1,width = "100%"
         ),
 
         numericInput(
@@ -286,7 +286,7 @@ ui <- page_fluid(
         numericInput(
           "setSeed",
           "Seed",
-          value = 12345,
+          value = 112344556,
           min = 1,
           step = 1
         )

@@ -419,7 +419,8 @@ struct MicroEnvironment {
     double scale_size = 5;
 
     // then make n to check
-    n_to_check = (int) std::ceil(p_members_contagious * scale_size);
+    // ceil biases towards more infections
+    n_to_check = (int) std::round(p_members_contagious * scale_size);
     // n_to_check = n_members_contagious;
     // *****************************************
 
