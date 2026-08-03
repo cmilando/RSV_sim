@@ -5026,7 +5026,7 @@
       "checksum": "9ba4de97f2e905e1a6e522ffc6923c38"
     },
     "app.R": {
-      "checksum": "dbfcfaf880f84042ec9c71cf6070135b"
+      "checksum": "192a15878e56a0a106472a2f0cd05333"
     },
     "contact_matrix.cpp": {
       "checksum": "7142c5fe8423263f418684ff58989bd6"
@@ -5105,6 +5105,9 @@
     },
     "old_code/x_l.RDS": {
       "checksum": "694f65b46aa66a2b8b7366e51115e501"
+    },
+    "README.md": {
+      "checksum": "0eeeb05615a741f3ffed7507fc052df8"
     },
     "set_ids.cpp": {
       "checksum": "da8f30eb5530f6243a893e436636f0e7"

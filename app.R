@@ -10,7 +10,6 @@ library(jsonlite)
 library(ggplot2)
 library(ggpubr)
 library(patchwork)
-library(waiter)
 
 #----------------------------------------------------------
 # Functions
