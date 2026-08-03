@@ -153,8 +153,17 @@ make_diagnostic_plots <- function(out, n_days = n_days,
     ggtitle("Incidence location") +
     scale_fill_viridis_c(option = "magma")
 
+  ##
+  p_ever_infected = data.table(p = out$p_ever_infected)
+  p_ever_infected$hour = 1:nrow(p_ever_infected)
+
+  p4 <- ggplot(p_ever_infected) + theme_classic2() +
+    geom_line(aes(x = hour, y = p * 100), col = 'red') +
+    coord_cartesian(ylim = c(0, 100)) + ylab("%") +
+    ggtitle("Percent ever infected")
+
   #
-  p1 + p2 + p3 +
+  p1 + p2 + p3 + p4
     plot_layout(ncol = 1)
 
 }
@@ -175,13 +184,15 @@ set.seed(1234)
 pop_df$asymptomatic <- runif(nrow(pop_df)) < 0.1
 
 ## add stays home when infected
+set.seed(1235)
 pop_df$stays_home   <- runif(nrow(pop_df)) < 0.8
 head(pop_df)
 
 ## and seed the initial infections
+set.seed(1236)
 pop_df$infected <- FALSE
-# rr <- runif(nrow(pop_df)) < 0.05
-rr <- pop_df$household_id == 3
+infection_percent <- 0.1
+rr <- sample(1:nrow(pop_df), infection_percent * nrow(pop_df), replace = F)
 pop_df$infected[rr] <- TRUE
 head(pop_df)
 
@@ -239,39 +250,39 @@ track = list(person_IDs = person_IDs,
 track
 
 ### *********
-# Rcpp::sourceCpp("get_timeseries.cpp")
-# set.seed(123)
-# set.seed(1234)
-# set.seed(12345)
-# out <- get_timeseries(
-#   df_mat,
-#   ta_mat,
-#   n_days = 100,
-#   ## ** variables for calibration
-#   transmission_probability = 0.00125,
-#   ##
-#   virus_decay_days = as.integer(3),
-#   incubation_days = as.integer(3),
-#   recovery_days = as.integer(3),
-#   ##
-#   ## // yeah this is a problem because this changes things ....
-#   ## // obviously the more draws you have here the more likely it is to
-#   ## // succeed... .... ... ...
-#   ## // this is also a problem because it adds a ton of extra time to each
-#   ## // run ....
-#   ## // maybe it should just normalize without doing extra draws
-#   ## // in which case it can just be a scalar.
-#   ## scale_size = as.integer(20000),
-#   ## //
-#   ##
-#   personIDs_to_track = as.integer(track$person_IDs),
-#   hhIDs_to_track = as.integer(track$household_IDs),
-#   workIDs_to_track = as.integer(track$work_IDs),
-#   schoolIDs_to_track = as.integer(track$school_IDs),
-#   commIDs_to_track = as.integer(track$comm_IDs)
-# )
-#
-# make_tracked_plots(out, n_days = 100, ncol = 2, xzoom = c(0, 100 * 25))
+Rcpp::sourceCpp("get_timeseries.cpp")
+set.seed(123)
+set.seed(1234)
+set.seed(12345)
+out <- get_timeseries(
+  df_mat,
+  ta_mat,
+  n_days = 100,
+  ## ** variables for calibration
+  transmission_probability = 0.00125,
+  ##
+  virus_decay_days = as.integer(3),
+  incubation_days = as.integer(3),
+  recovery_days = as.integer(3),
+  ##
+  ## // yeah this is a problem because this changes things ....
+  ## // obviously the more draws you have here the more likely it is to
+  ## // succeed... .... ... ...
+  ## // this is also a problem because it adds a ton of extra time to each
+  ## // run ....
+  ## // maybe it should just normalize without doing extra draws
+  ## // in which case it can just be a scalar.
+  ## scale_size = as.integer(20000),
+  ## //
+  ##
+  personIDs_to_track = as.integer(track$person_IDs),
+  hhIDs_to_track = as.integer(track$household_IDs),
+  workIDs_to_track = as.integer(track$work_IDs),
+  schoolIDs_to_track = as.integer(track$school_IDs),
+  commIDs_to_track = as.integer(track$comm_IDs)
+)
+
+make_tracked_plots(out, n_days = 100, ncol = 2, xzoom = c(0, 100 * 25))
 
 
 

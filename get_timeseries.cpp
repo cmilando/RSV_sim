@@ -79,6 +79,8 @@ struct Person {
   int recovery_counter        = timesteps_for_recovery;
   int waning_recovery_counter = timesteps_for_waning_recovery;
 
+  bool ever_infected = false;
+
   // ---------------------
   // METHODS
   // ---------------------
@@ -206,6 +208,7 @@ struct Person {
     incidence_location = location;
     // and reset this so its ready for next time
     incubation_counter = timesteps_for_incubation;
+    ever_infected = true;
   }
 
   // *************
@@ -380,8 +383,6 @@ struct MicroEnvironment {
         double proxy_n_contagious = (last_n_members_contagious) *
           std::pow(1 - hourly_decay_rate, hours_elapsed);
 
-        n_to_check = (int) std::round(proxy_n_contagious);
-
         // // make a percentage
         p_members_contagious = (double) proxy_n_contagious / (double) n_members;
 
@@ -398,6 +399,7 @@ struct MicroEnvironment {
         zone_is_contagious = false;
         decay_counter = timesteps_for_decay;
         p_members_contagious = 0.0;
+        n_to_check = 0;
       }
     }
 
@@ -414,11 +416,11 @@ struct MicroEnvironment {
     // and use the ceil() later.
     // the problem is if you don't get enough bites of the apple
     // then things don't get off the ground
-    //double scale_size = 1;
+    double scale_size = 5;
 
     // then make n to check
-    // n_to_check = (int) std::ceil(p_members_contagious * scale_size);
-    n_to_check = n_members_contagious;
+    n_to_check = (int) std::ceil(p_members_contagious * scale_size);
+    // n_to_check = n_members_contagious;
     // *****************************************
 
     // then update the status of each person
@@ -504,6 +506,10 @@ List get_timeseries(
   // Prevalence is total number of cases at this time
   Rcpp::IntegerMatrix incidence_mat(n_timesteps, n_ages);
   Rcpp::IntegerMatrix prevalence_mat(n_timesteps, n_ages);
+
+  // and i want to track the proportion of the population that
+  // were ever infected
+  Rcpp::DoubleVector p_ever_infected(n_timesteps);
 
   // ----------------------------------------------
   // **** AGENT OBJECTS *****
@@ -726,6 +732,15 @@ List get_timeseries(
       }
 
       // ***********************
+      // and the percent of people ever infected
+      int total_ever_infected = 0;
+      for(int pi = 0; pi < n_people; pi++) {
+        total_ever_infected += (int) people[pi].ever_infected;
+      }
+      p_ever_infected[timestep] = (double) total_ever_infected /
+        (double) n_people;
+
+      // ***********************
       // ITERATE
       timestep++;
 
@@ -751,7 +766,8 @@ List get_timeseries(
     _["community_conc"]  = cc_mat,
     _["incidence"]       = incidence_mat,
     _["prevalence"]      = prevalence_mat,
-    _["incidence_location"]      = incidence_location
+    _["incidence_location"]      = incidence_location,
+    _["p_ever_infected"] = p_ever_infected
   );
 
 }
