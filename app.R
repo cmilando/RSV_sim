@@ -175,7 +175,7 @@ make_diagnostic_plots <- function(out, n_days = n_days,
 
   #
   p1 + p2 + p3 + p4 +
-    plot_layout(ncol = 1)
+    plot_layout(ncol = 2)
 
 }
 
@@ -429,7 +429,7 @@ server <- function(input, output, session){
 
     make_diagnostic_plots(out, xzoom = c(input$xzoom[1], input$xzoom[2]))
 
-  }, height = 1000)
+  }, height = 500)
 
 }
 
