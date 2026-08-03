@@ -41,7 +41,7 @@ ui <- page_fluid(
         numericInput(
           "n_days",
           "Simulation days",
-          value = 25,
+          value = 100,
           min = 1,
           max = 100,
           step = 1
@@ -52,7 +52,7 @@ ui <- page_fluid(
         numericInput(
           "transProb",
           "Transmission probability",
-          value = 0.00085,
+          value = 0.00125,
           min = 0,
           max = 1,
           step = 0.01
@@ -61,7 +61,7 @@ ui <- page_fluid(
         numericInput(
           "setSeed",
           "Seed",
-          value = 123,
+          value = 12345,
           min = 1,
           step = 1
         ),

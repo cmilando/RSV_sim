@@ -137,9 +137,8 @@ struct Person {
       // essentially the reservoir becomes another person to check against
       if(n_people_contagious > 0) {
         if(is_incubating == false) {
-          int n_draws = n_people_contagious;
-          Rcpp::NumericVector xrand = runif(n_draws, 0, 1);
-          for(int i = 0; i < n_draws; i++) {
+          Rcpp::NumericVector xrand = runif(n_people_contagious, 0, 1);
+          for(int i = 0; i < n_people_contagious; i++) {
             if(xrand[i] < transmission_probability) {
               is_incubating = true;
               break;
@@ -258,7 +257,6 @@ struct MicroEnvironment {
   int id;
   int location;            // 0: Home, 1: Work, 2: School, 3: Community
   int decay_days; // how long can the virus last in the air
-  int scale_size;
 
   // ---------------------
   // INTERNAL
@@ -315,7 +313,7 @@ struct MicroEnvironment {
     n_members_contagious = 0;
     int non_local_contagious_members = 0;
     p_members_contagious = 0.0;
-    int scaled_n_people_contagious = 0;
+    int n_to_check = 0;
 
     // define if this zone is presently infected
     for(int pi = 0; pi < n_members; pi++) {
@@ -366,12 +364,6 @@ struct MicroEnvironment {
       // make a percentage
       p_members_contagious = (double) n_members_contagious / (double) n_members;
 
-      // scale the number of people infected to 20
-      // reduce draws so this isn't so much
-      scaled_n_people_contagious =
-        (int) std::round(p_members_contagious * (double) scale_size);
-
-
     } else {
       // was it just infected and now its not? start the counter
       if(zone_is_contagious) {
@@ -383,22 +375,21 @@ struct MicroEnvironment {
         // and since we have a counter counting down
         //
         double hours_elapsed = (double) timesteps_for_decay - (double) decay_counter;
+
         // // double drate = 1 - pow(1/last_n_members_contagious, 1/t);
         double proxy_n_contagious = (last_n_members_contagious) *
           std::pow(1 - hourly_decay_rate, hours_elapsed);
 
+        n_to_check = (int) std::round(proxy_n_contagious);
+
         // // make a percentage
         p_members_contagious = (double) proxy_n_contagious / (double) n_members;
+
         if(p_members_contagious == 0.0) {
           Rcpp::Rcout << "n_members: " << n_members << "\n";
           Rcpp::Rcout << "n_members contagious: " << n_members_contagious << "\n";
           Rcpp::stop("P == 0\n");
         }
-
-        // scale the number of people infected to 20
-        // reduce draws so this isn't so much
-        scaled_n_people_contagious =
-          (int) std::round(p_members_contagious * (double) scale_size);
 
       }
       // if the room has been empty for long enough,
@@ -406,7 +397,7 @@ struct MicroEnvironment {
       if(decay_counter == 0) {
         zone_is_contagious = false;
         decay_counter = timesteps_for_decay;
-        scaled_n_people_contagious = 0;
+        p_members_contagious = 0.0;
       }
     }
 
@@ -417,11 +408,24 @@ struct MicroEnvironment {
       Rcpp::stop("P > 100\n");
     }
 
+    // *****************************************
+    // gives each person a second chance? this inflates the transmission
+    // probability though, so maybe best to leave this it 1
+    // and use the ceil() later.
+    // the problem is if you don't get enough bites of the apple
+    // then things don't get off the ground
+    //double scale_size = 1;
+
+    // then make n to check
+    // n_to_check = (int) std::ceil(p_members_contagious * scale_size);
+    n_to_check = n_members_contagious;
+    // *****************************************
+
     // then update the status of each person
     for(int pi = 0; pi < n_members; pi++) {
       person_id = member_ids[pi];
       if(people[person_id].location == location) {
-        people[person_id].update_state(scaled_n_people_contagious);
+        people[person_id].update_state(n_to_check);
       }
     }
 
@@ -434,12 +438,10 @@ struct MicroEnvironment {
   MicroEnvironment(
          int id_,
          int location_,
-         int decay_days_,
-         int scale_size_)
+         int decay_days_)
     : id(id_),
       location(location_),
-      decay_days(decay_days_),
-      scale_size(scale_size_) {}
+      decay_days(decay_days_) {}
 
 };
 
@@ -567,8 +569,7 @@ List get_timeseries(
     households.emplace_back(
       i,    // id
       0,    // location
-      virus_decay_days, // how long can the virus last in the air
-      100 // scale size
+      virus_decay_days // how long can the virus last in the air
     );
   }
 
@@ -576,8 +577,7 @@ List get_timeseries(
     workplaces.emplace_back(
       i,    // id
       1,    // location
-      virus_decay_days, // how long can the virus last in the air
-      100 // scale size
+      virus_decay_days // how long can the virus last in the air
     );
   }
 
@@ -585,8 +585,7 @@ List get_timeseries(
     schools.emplace_back(
       i,    // id
       2,    // location
-      virus_decay_days, // how long can the virus last in the air
-      100 // scale size
+      virus_decay_days // how long can the virus last in the air
     );
   }
 
@@ -594,8 +593,7 @@ List get_timeseries(
     communities.emplace_back(
       i,    // id
       3,    // location
-      virus_decay_days, // how long can the virus last in the air
-      100 // scale size
+      virus_decay_days // how long can the virus last in the air
     );
   }
 
