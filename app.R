@@ -10,6 +10,7 @@ library(jsonlite)
 library(ggplot2)
 library(ggpubr)
 library(patchwork)
+library(waiter)
 
 #----------------------------------------------------------
 # Functions
@@ -230,7 +231,7 @@ ui <- page_fluid(
       sidebar = card(
         card_header("Model Settings"),
 
-        actionButton(
+        input_task_button(
           "run",
           "Run model",
           class = "btn-primary w-100"
