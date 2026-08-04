@@ -145,7 +145,15 @@ struct Person {
         if(is_incubating == false) {
           double xrand = runif(1, 0, 1)[0];
           if(xrand < (transmission_probability * p_people_infected)) {
-            infect();
+            // infect();
+            is_incubating = true;
+            SEIR_status = 2;
+            // TODO: need to change these to be .push()
+            // because we will be running this over time
+            is_incident = true;
+            incidence_location = location;
+            // and reset this so its ready for next time
+            ever_infected = true;
           }
         }
       }
@@ -191,7 +199,7 @@ struct Person {
     if(SEIR_status == 3) {
       waning_recovery_counter--;
       if(waning_recovery_counter == 0) {
-        SEIR_status = 1; // you revert back to being susceptible
+        SEIR_status = 0; // you revert back to being susceptible
         // and reset this so its ready for next time
         waning_recovery_counter = timesteps_for_waning_recovery;
       }
