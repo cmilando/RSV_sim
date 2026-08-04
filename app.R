@@ -16,7 +16,7 @@ library(patchwork)
 #----------------------------------------------------------
 
 get_rect_hours <- function(starttime, n_days) {
-  xx <- rep(24, n_days)
+  xx <- rep(1, n_days)
   yy <- 0:(n_days - 1)
   zz <- xx * yy
   o <- rep(starttime, n_days)
@@ -25,8 +25,8 @@ get_rect_hours <- function(starttime, n_days) {
 
 make_bars <- function(starttime, endtime, xfill, n_days) {
   return(annotate(geom = 'rect',
-                  xmin = get_rect_hours(starttime, n_days),
-                  xmax = get_rect_hours(endtime, n_days),
+                  xmin = get_rect_hours(starttime/24, n_days),
+                  xmax = get_rect_hours(endtime/24, n_days),
                   ymin= -Inf, ymax = Inf, fill = xfill))
 }
 
@@ -39,7 +39,7 @@ get_melt <- function(x, xnames, xcol = 'hour', xoffset = 0) {
 }
 
 make_tracked_plots <- function(out, track, n_days = n_days,
-                               xzoom = c(0, n_days * 24), ncol = 1) {
+                               xzoom = c(0, n_days), ncol = 1) {
 
   ###
   person_seir_melt = get_melt(out$person_seir, track$person_IDs)
@@ -49,11 +49,11 @@ make_tracked_plots <- function(out, track, n_days = n_days,
     labels = c('Susceptible', 'Exposed', 'Infected', 'Recovered'))
 
   p1 <- ggplot(person_seir_melt) + theme_classic2() +
-    geom_tile(aes(x = hour, y = variable, fill = value),
+    geom_tile(aes(x = hour / 24, y = variable, fill = value),
               color= 'white', linewidth = 0.05) +
     scale_fill_viridis_d(name = NULL) + ylab("person_id") +
     coord_cartesian(xlim = xzoom) +
-    theme(axis.text.y = element_blank()) +
+    theme(axis.text.y = element_blank()) + xlab("Day") +
     ggtitle("Person SEIR")
 
   ###
@@ -64,12 +64,12 @@ make_tracked_plots <- function(out, track, n_days = n_days,
     labels = c('Household', 'Work', 'School', 'Community'))
 
   p1a <-  ggplot(person_location_melt) + theme_classic2() +
-    geom_tile(aes(x = hour, y = variable, fill = value),
+    geom_tile(aes(x = hour / 24, y = variable, fill = value),
               color= 'white', linewidth = 0.05) +
     scale_fill_viridis_d(option = 'magma', name= NULL) +
     ylab("person_id") +
     coord_cartesian(xlim = xzoom) +
-    theme(axis.text.y = element_blank()) +
+    theme(axis.text.y = element_blank()) + xlab("Day") +
     ggtitle("Person location")
 
   ### if track has household ID then plot this
@@ -80,9 +80,9 @@ make_tracked_plots <- function(out, track, n_days = n_days,
     make_bars(8, 9, 'lightyellow', n_days) +
     make_bars(9, 17, 'lavender', n_days) +
     make_bars(17, 20, 'lightyellow', n_days) +
-    geom_line(aes(x = hour, y = value * 100, color = variable),
+    geom_line(aes(x = hour / 24, y = value * 100, color = variable),
               show.legend = F) +
-    coord_cartesian(xlim = xzoom, ylim = c(0, 100)) +
+    coord_cartesian(xlim = xzoom, ylim = c(0, 100)) + xlab("Day") +
     ylab("%") +
     ggtitle("Households: % of population infected")
 
@@ -94,9 +94,9 @@ make_tracked_plots <- function(out, track, n_days = n_days,
     make_bars(9, 17, 'lavender', n_days) +
     make_bars(17, 20, 'lightyellow', n_days) +
     coord_cartesian(xlim = xzoom, ylim = c(0, 100)) +
-    geom_line(aes(x = hour, y = value * 100, color = variable),
+    geom_line(aes(x = hour / 24, y = value * 100, color = variable),
               show.legend = F) +
-    ylab("%") +
+    ylab("%") + xlab("Day") +
     ggtitle("Work places: % of population infected")
 
   ###
@@ -107,9 +107,9 @@ make_tracked_plots <- function(out, track, n_days = n_days,
     make_bars(9, 17, 'lavender', n_days) +
     make_bars(17, 20, 'lightyellow', n_days) +
     coord_cartesian(xlim = xzoom, ylim = c(0, 100)) +
-    geom_line(aes(x = hour, y = value * 100, color = variable),
+    geom_line(aes(x = hour / 24, y = value * 100, color = variable),
               show.legend = F) +
-    ylab("%") +
+    ylab("%") + xlab("Day") +
     ggtitle("Schools: % of population infected")
 
   #
@@ -120,9 +120,9 @@ make_tracked_plots <- function(out, track, n_days = n_days,
     make_bars(9, 17, 'lavender', n_days) +
     make_bars(17, 20, 'lightyellow', n_days) +
     coord_cartesian(xlim = xzoom, ylim = c(0, 100)) +
-    geom_line(aes(x = hour, y = value * 100, color = variable),
+    geom_line(aes(x = hour / 24, y = value * 100, color = variable),
               show.legend = F) +
-    ylab("%") +
+    ylab("%") + xlab("Day") +
     ggtitle("Communities: % of population infected")
   p4
 
@@ -138,18 +138,18 @@ make_diagnostic_plots <- function(out, n_days = n_days,
   incidence_melt$age <- as.integer(as.character(incidence_melt$variable))
 
   p1 <- ggplot(incidence_melt) + theme_classic2() +
-    geom_tile(aes(x = hour, y = age, fill = value)) +
+    geom_tile(aes(x = hour / 24, y = age, fill = value)) +
     scale_fill_gradientn(colors = c('white', 'red', 'purple')) +
-    coord_cartesian(xlim = xzoom) +
+    coord_cartesian(xlim = xzoom) + xlab("Day") +
     ggtitle("Incidence (new cases each hour)")
 
   prevalence_melt <- get_melt(out$prevalence, 0:100)
   prevalence_melt$age <- as.integer(as.character(prevalence_melt$variable))
 
   p2 <- ggplot(prevalence_melt) + theme_classic2() +
-    geom_tile(aes(x = hour, y = age, fill = value)) +
+    geom_tile(aes(x = hour / 24, y = age, fill = value)) +
     scale_fill_gradientn(colors = c('white', 'red', 'purple')) +
-    coord_cartesian(xlim = xzoom) +
+    coord_cartesian(xlim = xzoom) + xlab("Day") +
     ggtitle("Prevalence (total cases each hour)")
 
   location_vec <- c('Household', 'Work', 'School', 'Community')
@@ -169,8 +169,8 @@ make_diagnostic_plots <- function(out, n_days = n_days,
   p_ever_infected$hour = 1:nrow(p_ever_infected)
 
   p4 <- ggplot(p_ever_infected) + theme_classic2() +
-    geom_line(aes(x = hour, y = p * 100), col = 'red') +
-    coord_cartesian(ylim = c(0, 100)) + ylab("%") +
+    geom_line(aes(x = hour / 24, y = p * 100), col = 'red') +
+    coord_cartesian(ylim = c(0, 100)) + ylab("%") + xlab("Day") +
     ggtitle("Percent ever infected")
 
   #
@@ -239,9 +239,9 @@ ui <- page_fluid(
         numericInput(
           "n_days",
           "Simulation days",
-          value = 25,
+          value = 50,
           min = 1,
-          max = 50,
+          max = 100,
           step = 1
         ),
 
@@ -250,7 +250,7 @@ ui <- page_fluid(
         numericInput(
           "transProb",
           "Transmission probability",
-          value = 0.012,
+          value = 0.04,
           min = 0,
           max = 1,
           step = 0.01
@@ -263,6 +263,12 @@ ui <- page_fluid(
           min = 0.1,
           max = 5,
           step = 0.1
+        ),
+
+        radioButtons(
+          "infectOpts",
+          "Infect Community_id = 0 or % of Random?",
+          choices = c('Community 0', 'Random')
         ),
 
         numericInput(
@@ -309,9 +315,9 @@ ui <- page_fluid(
 server <- function(input, output, session){
 
   output$xzoom_ui <- renderUI({
-    sliderInput("xzoom", "X range",
-                min = 0, max = input$n_days * 24,
-                value = c(0, input$n_days * 24))
+    sliderInput("xzoom", "Plot day range",
+                min = 0, max = input$n_days,
+                value = c(0, input$n_days))
   })
 
   results <- eventReactive(input$run, {
@@ -320,11 +326,28 @@ server <- function(input, output, session){
 
     # all things that follow from random
     pop_size <- nrow(pop_df)
+
+    # (1) percent of the population that is asymptomatic
     pop_df$asymptomatic <- runif(pop_size) < (input$p_asymptomatic / 100)
+
+    # (2) percent of the population that stays home when they are symptomatic
     pop_df$stays_home   <- runif(pop_size) < (input$p_staysHome / 100)
+
+    # (3) who is infected at the outset
     pop_df$infected <- FALSE
-    rr <- sample(1:pop_size,size = (input$p_initInfect / 100) * pop_size,
-                 replace = F)
+
+    if(input$infectOpts == 'Random') {
+      # -- option 1 -- random
+      rr <- sample(1:pop_size, size = (input$p_initInfect / 100) * pop_size,
+                   replace = F)
+    } else {
+      # -- option 2 -- the same number of people but for community 0
+      rr <- which(pop_df$community_id == 0)
+      rr <- sample(rr, size = min(length(rr),
+                                  (input$p_initInfect / 100) * pop_size),
+                   replace = F)
+    }
+
     pop_df$infected[rr] <- TRUE
 
     # convert to integer

@@ -115,7 +115,7 @@ struct Person {
   // *************************************************
   // *** method to check if the person is infected ***
   // *************************************************
-  void update_state(int n_people_contagious) {
+  void update_state(double p_people_infected) {
 
     // incident is only true if you turn incident this timestep
     is_incident = false;
@@ -124,7 +124,7 @@ struct Person {
     if(SEIR_status == 0) {
       // if you are susceptible (SEIR = 0) and in an
       // infected zone, you are now exposed
-      if(n_people_contagious > 0) {
+      if(p_people_infected > 0.0) {
         SEIR_status = 1;
       }
     }
@@ -135,28 +135,18 @@ struct Person {
       // if you are in an exposed zoned and
       // if you have't started to incubate yet
       // check if you start against your transmission probability
-      // TODO: could change this to check against a probability that you decide
-      // essentially the reservoir becomes another person to check against
-      if(n_people_contagious > 0) {
+      // -- you are comparing your transmission probability
+      //    against the percent of the population in the room that
+      //    is infected. so its sort of like there are two things going on
+      // (1) you have a 25% chance of contacting someone who is infected
+      // (2) once you do contact someone, you have a 5% chance of getting it
+      // multiply them together and compare that, 1x per hour.
+      if(p_people_infected > 0.0) {
         if(is_incubating == false) {
-          Rcpp::NumericVector xrand = runif(n_people_contagious, 0, 1);
-          for(int i = 0; i < n_people_contagious; i++) {
-            if(xrand[i] < transmission_probability) {
-              is_incubating = true;
-              break;
-            }
+          double xrand = runif(1, 0, 1)[0];
+          if(xrand < (transmission_probability * p_people_infected)) {
+            infect();
           }
-        }
-      }
-
-      // once you cross some threshold of exposure,
-      // you are on the pathway towards being infected,
-      // aka you are incubating,
-      // so start counting down
-      if(is_incubating) {
-        incubation_counter--;
-        if(incubation_counter == 0) {
-          infect();
         }
       }
 
@@ -171,12 +161,26 @@ struct Person {
     // Infected, now you are infected
     if(SEIR_status == 2) {
 
-      // infected -> recovered
-      recovery_counter--;
-      if(recovery_counter == 0) {
-        SEIR_status = 3;
-        // and reset this so its ready for next time
-        recovery_counter = timesteps_for_recovery;
+      // this is really the countdown to being symptomatic
+      // but you can still infect people so these are just
+      // components of being infected
+      if(is_incubating) {
+        incubation_counter--;
+        if(incubation_counter == 0) {
+          is_incubating = false;
+          incubation_counter = timesteps_for_incubation;
+          // *** TODO: insert something about symptom onset is now,
+          // maybe this is where you get tested
+        }
+      } else {
+        // once you are done incubating you can begin recovering
+        // infected -> recovered
+        recovery_counter--;
+        if(recovery_counter == 0) {
+          SEIR_status = 3;
+          // and reset this so its ready for next time
+          recovery_counter = timesteps_for_recovery;
+        }
       }
 
       // you changed a counter, so return
@@ -200,14 +204,13 @@ struct Person {
   // ** infect ***
   // *************
   void infect() {
-    is_incubating = false;
+    is_incubating = true;
     SEIR_status = 2;
     // TODO: need to change these to be .push()
     // because we will be running this over time
     is_incident = true;
     incidence_location = location;
     // and reset this so its ready for next time
-    incubation_counter = timesteps_for_incubation;
     ever_infected = true;
   }
 
@@ -268,14 +271,12 @@ struct MicroEnvironment {
   int timesteps_for_decay = 24 * decay_days;
   int decay_counter = timesteps_for_decay;
   //
-  bool zone_is_contagious = false;
+  bool zone_is_infected = false;
   //
   std::vector<int> member_ids;
   int n_members = 0;
-  double p_members_contagious;
-  double total_p_members_contagious;
-  int n_members_contagious;
-  int last_n_members_contagious;
+  double total_p_members_infected;
+  int last_n_members_infected;
 
   // ---------------------
   // METHODS
@@ -293,7 +294,7 @@ struct MicroEnvironment {
     if(location == 2) loc_str = "School";
     if(location == 3) loc_str = "Community";
 
-    Rcpp::Rcout << loc_str << " " << id << ": " << zone_is_contagious << "\n";
+    Rcpp::Rcout << loc_str << " " << id << ": " << zone_is_infected << "\n";
   }
 
   // ************
@@ -313,10 +314,9 @@ struct MicroEnvironment {
     // the same lookup each time
 
     int person_id;
-    n_members_contagious = 0;
-    int non_local_contagious_members = 0;
-    p_members_contagious = 0.0;
-    int n_to_check = 0;
+    int n_members_infected = 0;
+    int non_local_infected_members = 0;
+    double p_members_infected = 0.0;
 
     // define if this zone is presently infected
     for(int pi = 0; pi < n_members; pi++) {
@@ -326,21 +326,19 @@ struct MicroEnvironment {
         // then if they are incubating or infected,
         // this adds to the percent of the
         // environment that is infected
-        if((people[person_id].is_incubating) ||
-           (people[person_id].SEIR_status == 2)) {
-          n_members_contagious++;
+        if(people[person_id].SEIR_status == 2) {
+          n_members_infected++;
         }
       } else {
-        if((people[person_id].is_incubating) ||
-           (people[person_id].SEIR_status == 2)) {
-          non_local_contagious_members++;
+        if(people[person_id].SEIR_status == 2) {
+          non_local_infected_members++;
         }
       }
     }
 
     // the overall size regardless of location
-    total_p_members_contagious =
-      (double) (n_members_contagious + non_local_contagious_members) /
+    total_p_members_infected =
+      (double) (n_members_infected + non_local_infected_members) /
         (double) n_members;
 
     // Ok so there are two mechanisms for people to get infected
@@ -358,77 +356,66 @@ struct MicroEnvironment {
     // this has minimal impacts because you are juse adding +1
     // to the draw against transmission probability
     // and it lingers
-    if(n_members_contagious > 0) {
+    if(n_members_infected > 0) {
 
       // update this
-      zone_is_contagious = true;
-      last_n_members_contagious = n_members_contagious;
+      zone_is_infected = true;
+      last_n_members_infected = n_members_infected;
 
       // make a percentage
-      p_members_contagious = (double) n_members_contagious / (double) n_members;
+      // the reason you do this is so that households can compete
+      // with larger networks in terms of potential for infection
+      p_members_infected = (double) n_members_infected / (double) n_members;
 
     } else {
-      // was it just infected and now its not? start the counter
-      if(zone_is_contagious) {
-        decay_counter--;
-        // from y = a(1-r)^t
-        // to get R when y is 1
-        // R = 1 - (1/a)^(1/t)
-        // where t is n days
-        // and since we have a counter counting down
-        //
-        double hours_elapsed = (double) timesteps_for_decay - (double) decay_counter;
 
-        // // double drate = 1 - pow(1/last_n_members_contagious, 1/t);
-        double proxy_n_contagious = (last_n_members_contagious) *
+      // was it just infected and now its not? start the counter
+      if(zone_is_infected) {
+        //
+        decay_counter--;
+
+        // how many hours have gone by
+        double hours_elapsed = (double) timesteps_for_decay -
+          (double) decay_counter;
+
+        // apply the exponential decay hourly to the last n members
+        // the recent high water mark
+        double proxy_n_infected = (last_n_members_infected) *
           std::pow(1 - hourly_decay_rate, hours_elapsed);
 
         // // make a percentage
-        p_members_contagious = (double) proxy_n_contagious / (double) n_members;
+        p_members_infected = (double) proxy_n_infected / (double) n_members;
 
-        if(p_members_contagious == 0.0) {
+        if(p_members_infected == 0.0) {
           Rcpp::Rcout << "n_members: " << n_members << "\n";
-          Rcpp::Rcout << "n_members contagious: " << n_members_contagious << "\n";
+          Rcpp::Rcout << "n_members infected: " << n_members_infected << "\n";
           Rcpp::stop("P == 0\n");
         }
 
       }
+
       // if the room has been empty for long enough,
       // it becomes safe again
       if(decay_counter == 0) {
-        zone_is_contagious = false;
+        zone_is_infected = false;
         decay_counter = timesteps_for_decay;
-        p_members_contagious = 0.0;
-        n_to_check = 0;
+        p_members_infected = 0.0;
       }
+
     }
 
     // make some validity checks
-    if(p_members_contagious > 1.0) {
+    if(p_members_infected > 1.0) {
       Rcpp::Rcout << "n_members: " << n_members << "\n";
-      Rcpp::Rcout << "n_members contagious: " << n_members_contagious << "\n";
+      Rcpp::Rcout << "n_members infected: " << n_members_infected << "\n";
       Rcpp::stop("P > 100\n");
     }
-
-    // *****************************************
-    // gives each person a second chance? this inflates the transmission
-    // probability though, so maybe best to leave this it 1
-    // and use the ceil() later.
-    // the problem is if you don't get enough bites of the apple
-    // then things don't get off the ground
-    double scale_size = 5;
-
-    // then make n to check
-    // ceil biases towards more infections
-    n_to_check = (int) std::round(p_members_contagious * scale_size);
-    // n_to_check = n_members_contagious;
-    // *****************************************
 
     // then update the status of each person
     for(int pi = 0; pi < n_members; pi++) {
       person_id = member_ids[pi];
       if(people[person_id].location == location) {
-        people[person_id].update_state(n_to_check);
+        people[person_id].update_state(p_members_infected);
       }
     }
 
@@ -702,19 +689,19 @@ List get_timeseries(
       }
       for(int ti = 0; ti < ntrack_hh; ti ++) {
         this_id = hhIDs_to_track[ti];
-        hh_mat(timestep, ti) = households[this_id].total_p_members_contagious;
+        hh_mat(timestep, ti) = households[this_id].total_p_members_infected;
       }
       for(int ti = 0; ti < ntrack_ww; ti ++) {
         this_id = workIDs_to_track[ti];
-        ww_mat(timestep, ti) = workplaces[this_id].total_p_members_contagious;
+        ww_mat(timestep, ti) = workplaces[this_id].total_p_members_infected;
       }
       for(int ti = 0; ti < ntrack_ss; ti ++) {
         this_id = schoolIDs_to_track[ti];
-        ss_mat(timestep, ti) = schools[this_id].total_p_members_contagious;
+        ss_mat(timestep, ti) = schools[this_id].total_p_members_infected;
       }
       for(int ti = 0; ti < ntrack_cc; ti ++) {
         this_id = commIDs_to_track[ti];
-        cc_mat(timestep, ti) = communities[this_id].total_p_members_contagious;
+        cc_mat(timestep, ti) = communities[this_id].total_p_members_infected;
       }
 
       // ***********************
