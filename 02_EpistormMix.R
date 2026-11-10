@@ -1,3 +1,5 @@
+library(tidyverse)
+
 xdir = "~/Documents/GitHub/Epistorm-Mix/tutorials/data-analysis/data/"
 suppressMessages(library(tidyverse))
 
@@ -85,34 +87,6 @@ merged.df = left_join(resp_imp, cont_imp, by = "resp_id")
 
 head(merged.df)
 
-# make the overall graphs
-x.merged.df <- merged.df %>%
-  group_by(resp_id, resp_age_by5_80) %>%
-  summarize(.groups = 'keep',
-            n_contacts_crude  = n(),
-            n_weighted_mean = weighted.mean()
-            sum_weights = sum(weight, na.rm = T),
-            mean_weights = mean(weight, na.rm = T)) %>%
-  arrange(resp_age_by5_80) %>%
-  ungroup() %>%
-  group_by(resp_age_by5_80) %>%
-  summarize(
-    xmean = weighted.mean(n_contacts_crude, ),
-    # xlb = quantile(weighted_sum, probs = 0.25),
-    # xub = quantile(weighted_sum, probs = 0.75)
-  ) %>%
-  mutate(fct_int = -1*as.integer(resp_age_by5_80))
-
-head(x.merged.df)
-
-library(ggpubr)
-
-ggplot(x.merged.df) + theme_classic2() +
-  geom_col(aes(y = reorder(resp_age_by5_80, fct_int), x = xmean), fill = 'lightblue') +
-  geom_errorbar(aes(xmin = xlb, xmax = xub,  y = reorder(resp_age_by5_80, fct_int)),
-                width = 0.5) +
-  scale_x_continuous(breaks = seq(0, 14, by = 2)) +
-  theme(panel.grid.major.x = element_line(color = 'grey75', linewidth = 0.1))
 
 
 
@@ -316,3 +290,37 @@ ggplot(age_matrix) + # should be a data frame (long format)
         panel.background = element_rect(fill = "transparent", color = "black"),
         plot.background = element_rect(fill = "transparent", color = NA)
   )
+
+# pick out one slice
+head(age_matrix)
+
+age_matrix %>%
+  filter(resp_age_by5_80 == '0-4')
+
+# # make the overall graphs
+x.merged.df <- merged.df %>%
+  group_by(resp_id, resp_age_by5_80) %>%
+  summarize(.groups = 'keep',
+            n_contacts_crude  = n(),
+            sum_weights = sum(weight, na.rm = T),
+            mean_weights = mean(weight, na.rm = T)) %>%
+  arrange(resp_age_by5_80) %>%
+  ungroup() %>%
+  group_by(resp_age_by5_80) %>%
+  summarize(
+    xmean = mean(sum_weights),
+    xlb = quantile(sum_weights, probs = 0.25),
+    xub = quantile(sum_weights, probs = 0.75)
+  ) %>%
+  mutate(fct_int = -1*as.integer(resp_age_by5_80))
+
+head(x.merged.df)
+
+library(ggpubr)
+
+ggplot(x.merged.df) + theme_classic2() +
+  geom_col(aes(y = reorder(resp_age_by5_80, fct_int), x = xmean), fill = 'lightblue') +
+  geom_errorbar(aes(xmin = xlb, xmax = xub,  y = reorder(resp_age_by5_80, fct_int)),
+                width = 0.5) +
+  scale_x_continuous(breaks = seq(0, 14, by = 2)) +
+  theme(panel.grid.major.x = element_line(color = 'grey75', linewidth = 0.1))

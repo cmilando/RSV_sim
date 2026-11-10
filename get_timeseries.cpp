@@ -81,6 +81,9 @@ struct Person {
 
   bool ever_infected = false;
 
+  // And a way to track the contact matrix
+  std::vector<int> age_of_daily_contacts;
+
   // ---------------------
   // METHODS
   // ---------------------
@@ -269,7 +272,7 @@ struct MicroEnvironment {
   // ARGUMENTS
   // ---------------------
   int id;
-  int location;            // 0: Home, 1: Work, 2: School, 3: Community
+  int location;   // 0: Home, 1: Work, 2: School, 3: Community
   int decay_days; // how long can the virus last in the air
 
   // ---------------------
