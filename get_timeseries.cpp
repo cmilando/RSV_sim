@@ -66,6 +66,24 @@ struct Person {
   //     2 = Infected
   //     3 = Recovered
 
+  // Clinical severity state
+  int clinical_state = 0;
+  //     0 = None (not currently infected)
+  //     1 = I (subclinical infection)
+  //     2 = U (URTI)
+  //     3 = L (LRTI)
+  //     4 = H (SLRTI)
+  //     5 = R (Recovered)
+  //     6 = D (Dead)
+
+  // Scheduled clinical transition
+  int next_clinical_state = 0;
+  int transition_counter = 0;
+
+  // Immunization and infection history
+  int immunization_status = 0;
+  int prior_infection = 0;
+
   bool is_incubating          = false;
   bool is_incident            = false;
   int location                = 0;
@@ -220,6 +238,183 @@ struct Person {
     incidence_location = location;
     // and reset this so its ready for next time
     ever_infected = true;
+
+    // initialize clinical infection process
+    clinical_state = 1; // I: subclinical infection
+    // all infected start with subclinical infection
+
+    // call function to select next clinical state
+    select_clinical_transition();
+
+    // call function to select time before transition to next clinical state
+    select_transition_duration();
+  }
+
+  // ********************************************************
+  // *** select next clinical state (already infected)    ***
+  // ********************************************************
+  void select_clinical_transition() {
+    // random draw from uniform distribution
+    double transition_draw = R::runif(0.0, 1.0);
+
+    // I: subclinical infection
+    if (clinical_state == 1){
+      // placeholder probabilities of transition
+      // will eventually retrieve these based on
+      // age, immunization status, prior infection hist
+      double p_IU = 0.70;
+      double p_IR = 0.29;
+
+      if (transition_draw < p_IU){
+        next_clinical_state = 2; // U: URTI
+      }
+
+      else if (transition_draw < p_IU + p_IR){
+        next_clinical_state = 5; // R: Recovered
+      }
+
+      else {
+        next_clinical_state = 6; // D: Dead
+      }
+    }
+
+    // U: URTI
+    else if (clinical_state == 2){
+      double p_UL = 0.15;
+      double p_UR = 0.84;
+
+      if (transition_draw < p_UL){
+        next_clinical_state = 3; // L: LRTI
+      }
+
+      else if (transition_draw < p_UL + p_UR){
+        next_clinical_state = 5; // R: Recovered
+      }
+
+      else {
+        next_clinical_state = 6; // D: Dead
+      }
+    }
+
+    // L: LRTI
+    else if (clinical_state == 3){
+      double p_LH = 0.25;
+      double p_LR = 0.72;
+
+      if (transition_draw < p_LH){
+        next_clinical_state = 4; // H: SLRTI
+      }
+
+      else if (transition_draw < p_LH + p_LR){
+        next_clinical_state = 5; // R: Recovered
+      }
+
+      else {
+        next_clinical_state = 6; // D: Dead
+      }
+    }
+
+    // H: SLRTI
+    else if (clinical_state == 4){
+      double p_HR = 0.50;
+
+      if (transition_draw < p_HR){
+        next_clinical_state = 5; // R: Recovered
+      }
+
+      else {
+        next_clinical_state = 6; // D: Dead
+      }
+    }
+  }
+
+  // *******************************************************************
+  // *** select duration before transition to next clinical state    ***
+  // *******************************************************************
+  void select_transition_duration(){
+
+    // I --> U
+    // check agent's current clinical state and selected next state
+    if (clinical_state == 1 && next_clinical_state == 2){
+      transition_counter = 48; // Placeholder duration of 48 hours
+      // later replace 48 with sampled duration from appropriate vector
+    }
+
+    // I --> R
+    if (clinical_state == 1 && next_clinical_state == 5){
+      transition_counter = 120; // Placeholder: 120 hours (5 days)
+    }
+
+    // I --> D
+    if (clinical_state == 1 && next_clinical_state == 6){
+      transition_counter = 120; // Placeholder: 120 hours (5 days)
+    }
+
+    // U --> L
+    if (clinical_state == 2 && next_clinical_state == 3){
+      transition_counter = 48;
+    }
+
+    // U --> R
+    if (clinical_state == 2 && next_clinical_state == 5){
+      transition_counter = 120;
+    }
+
+    // U --> D
+    if (clinical_state == 2 && next_clinical_state == 6){
+      transition_counter = 120;
+    }
+
+    // L --> H
+    if (clinical_state == 3 && next_clinical_state == 4){
+      transition_counter = 48;
+    }
+
+    // L --> R
+    if (clinical_state == 3 && next_clinical_state == 5){
+      transition_counter = 120;
+    }
+
+    // L --> D
+    if (clinical_state == 3 && next_clinical_state == 6){
+      transition_counter = 120;
+    }
+
+    // H --> R
+    if (clinical_state == 4 && next_clinical_state == 5){
+      transition_counter = 120;
+    }
+
+    // H --> D
+    if (clinical_state == 4 && next_clinical_state == 6){
+      transition_counter = 120;
+    }
+  }
+
+  // ****************************************************
+  // *** update clinical state as duration elapses    ***
+  // ****************************************************
+  void update_clinical_state(){
+
+    // decrease transition_counter hourly
+    if (transition_counter > 0){
+      transition_counter--;
+    }
+
+    // move agent to next clinical state when duration elapses
+    if (transition_counter == 0 && clinical_state != 0
+          && clinical_state != 5 && clinical_state != 6){
+      // prevent uninfected, recovered, dead agents
+      // from transitioning to a new clinical state
+      clinical_state = next_clinical_state;
+
+      // select next transition upon entry into next clinical state
+      // if still infected
+      if(clinical_state >= 1 && clinical_state <= 4){
+        select_clinical_transition();
+        select_transition_duration();
+      }
+    }
   }
 
   // *************
@@ -615,6 +810,15 @@ List get_timeseries(
   // **** Seed the infections *****
   // ----------------------------------------------
 
+  //TODO: Clarify how initially seeded infections should be counted
+  //in cumulative infection outcomes.
+  //Currently, seeded agents are assigned SEIR_status=2 but
+  //ever_infected=false, so seeds are excluded from p_ever_infected
+  //unless they become reinfected.
+  //Consider whether to track:
+  //(1) proportion ever infected, including initial seeds
+  //(2) proportion newly infected during the simulation, exlcuding seeds
+
   // seed the infectors
   Rcpp::Rcout << "Initial infectors\n";
   for(int pi = 0; pi < n_people; pi++) {
@@ -685,6 +889,12 @@ List get_timeseries(
       // ALL COMMUNITY
       for(int cc_i = 0; cc_i < n_communities; cc_i++) {
         communities[cc_i].update_state(hour_i, people);
+      }
+
+      // ***********************
+      // UPDATE CLINICAL SEVERITY PROGRESSION
+      for(int pi = 0; pi < n_people; pi++){
+        people[pi].update_clinical_state();
       }
 
       // ***********************
@@ -767,3 +977,117 @@ List get_timeseries(
   );
 
 }
+
+// **************************************************************************//
+// function to test clinical progression components of model on individual agent
+// [[Rcpp::export]]
+Rcpp::IntegerVector test_clinical_progression_indiv(int n_hours = 500) {
+  //returns clinical_state codes at each simulated hour
+
+  //create test agent
+  Person person(
+    0,                      //id
+    25,                     //age
+    0,                      //household_id (required by constructor)
+    -999,                   //work_id (no assigned workplace)
+    -999,                   //school_id (no assigned school)
+    0,                      //community_id (required by constructor)
+    false,                  //asymptomatic (required by constructor, not used by clinical progression)
+    false,                  //stays_home (required by constructor, not used by clinical progression)
+    std::vector<int>(24,0), //baseline_time_activity (all 24 hours at home)
+    0.00125,                //transmission_probability (required by constructor, not used by clinical progression)
+    3,                      //incubation_days (required by constructor, not used by clinical progression)
+    3,                      //recovery_days (required by constructor, not used by clinical progression)
+    365                     //waning_recovery_days (required by constructor, not used by clinical progression)
+  );
+
+  //call infect() to initialize infection and clinical progression in test person
+  person.infect();
+    //initializes SEIR infection vars (is_incubating, SEIR status, is_incident, incidence_location, ever_infected)
+    //agent enters clinical state I
+    //next clinical state selected
+    //duration until first transition is assigned
+
+    //hourly loop below advanced clinical progression until terminal state reached (recovery or death)
+    //or until simulation ends
+
+  //store clinical_state at each hour
+  Rcpp::IntegerVector clinical_states(n_hours + 1);
+
+  //record initial clinical_state at hour 0
+  clinical_states[0] = person.clinical_state;
+    //should be clinical_states[0] = 1 because clinical_state set to 1 in person.infect()
+
+  //create loop to simulate advancing clinical progression hourly (after first hour)
+  for (int hour = 1; hour <= n_hours; hour++){
+    //update clinical progression (method in person structure)
+    person.update_clinical_state();
+    //record clinical state after hourly update
+    clinical_states[hour] = person.clinical_state;
+  }
+
+  //return vector clinical_states, which tracks progression in clinical_state hourly
+  return clinical_states;
+}
+
+// **************************************************************************//
+// function to test clinical progression components of model on pop of 10000 agents
+// [[Rcpp::export]]
+Rcpp::IntegerMatrix test_clinical_progression_pop(int n_agents = 10000, int n_hours = 500) {
+
+  //create matrix to store clinical states for all agents each hour
+  Rcpp::IntegerMatrix clinical_states(n_hours + 1, n_agents);
+
+  //create vector to store test agents
+  std::vector<Person> people;
+
+  //reserve memory for n_agents
+  people.reserve(n_agents);
+
+  //create population of test agents and initialize clinical progression
+  //loop runs once per agent
+  for (int i=0; i < n_agents; i++){
+    //create new agents using emplace_back()
+    people.emplace_back(
+      i,                      //id
+      25,                     //age
+      0,                      //household_id
+      -999,                   //work_id
+      -999,                   //school_id
+      0,                      //community_id
+      false,                  //asymptomatic
+      false,                  //stays_home
+      std::vector<int>(24,0), //baseline_time_activity
+      0.00125,                //transmission_probability
+      3,                      //incubation_days
+      3,                      //recovery_days
+      365                     //waning_recovery_days
+    );
+
+    //initialize infection and clinical progression for each agent using infect()
+    people[i].infect();
+
+    //record initial clinical state for each agent at hour 0 and record in matrix
+    clinical_states(0, i) = people[i].clinical_state;
+  }
+
+  //simulate clinical progression for all agents
+
+  //advance clinical progression one hour at a time
+  for (int hour=1; hour <= n_hours; hour++){
+    //update each agent during the current hour
+    for (int i=0; i<n_agents; i++){
+      //update clinical progression
+      people[i].update_clinical_state();
+
+      //record clinical state after hourly update and record in matrix
+      clinical_states(hour, i) = people[i].clinical_state;
+    }
+  }
+
+  //return matrix of clinical trajectories for all agents in population
+  return clinical_states;
+}
+
+
+
