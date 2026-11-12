@@ -1,161 +1,170 @@
-library(tidyverse)
+# /////////////////////////////////////////////////////////////////////////////
+# =============================================================================
+# SETUP
+# =============================================================================
+# /////////////////////////////////////////////////////////////////////////////
+
+library(data.table)
+library(mgcv)
+library(ggplot2)
+library(patchwork)
 
 xdir = "~/Documents/GitHub/Epistorm-Mix/tutorials/data-analysis/data/"
-suppressMessages(library(tidyverse))
 
-###
-person_db <- read.csv(file.path(xdir, "imputed_resp.csv"))
-subset(person_db, resp_id == 163925)
+# function for Age Breaks
+# age.breaks = list("_by5_80" = c(seq(0,80, by = 5), 120))
+set_age_breaks <- function(age_vec) {
+  cut(age_vec, breaks = c(seq(0,80, by = 5), 120), include.lowest = T)
+}
 
-head(person_db)
+# /////////////////////////////////////////////////////////////////////////////
+# =============================================================================
+# RESPONDENTS DATA
+# =============================================================================
+# /////////////////////////////////////////////////////////////////////////////
 
-###
-contact_db <- read.csv(file.path(xdir, "imputed_cont.csv"))
-subset(contact_db, resp_id == 163925)
+# this is the participant datasets
+resp_imp = read.csv(file.path(xdir, "imputed_resp.csv"))
+setDT(resp_imp)
+head(resp_imp)
 
-subset(person_db, resp_id == 325231)
+# add age fct
+resp_imp[, resp_age_by5_80 := set_age_breaks(resp_age)]
 
-####
-# i mean so what is the contact matrix
-# how do i use the weights
+# weighted number of respondents by age
+age_matrix_n = resp_imp[,
+  .(n = sum(weight, na.rm = T)),
+  by = resp_age
+]
+setorderv(age_matrix_n, cols = "resp_age")
+age_matrix_n
+
+## weighted number of respondents by age group
+age_matrix_n_fct = resp_imp[,
+  .(n = sum(weight, na.rm = T)),
+  by = resp_age_by5_80
+]
+setorderv(age_matrix_n_fct, cols = "resp_age_by5_80")
+age_matrix_n_fct
+
+# /////////////////////////////////////////////////////////////////////////////
+# =============================================================================
+# CONTACT DATA
+# =============================================================================
+# /////////////////////////////////////////////////////////////////////////////
+
+# this is the contact data
+# -- CM UPDATES --
+# there are some NAs here so I'm going to remove
+# in either setting or by Age
+# how are we supposed to to know what the contact
+# matrix is with these included
+# reduces the data from 15,000 to 12,000 -- not terrible
+# ----------------
+cont_imp = read.csv(file.path(xdir, "imputed_cont.csv"))
+setDT(cont_imp)
+head(cont_imp)
+
+# add age fct
+cont_imp[, cont_age_by5_80 := set_age_breaks(cont_age)]
+
 #
+cont_imp <- subset(cont_imp, !is.na(cont_setting) & !is.na(cont_age))
+any(is.na(cont_imp))
 
-pop_grp1 <- subset(person_db, resp_age %in% c(1:10))
+# # ok so some of these are NA because they are customers at work
+# but we can't include these in the contact matrix because we don't know their age
+# subset(cont_imp, is.na(cont_age))
+#
+# # ok but this seems different
+# subset(cont_imp, is.na(cont_setting))
+# subset(cont_imp, cont_id == 27)
 
-all_contacts <- subset(contact_db, resp_id %in% c(pop_grp1$resp_id))
-
-all_contacts %>%
-  group_by(resp_id, cont_setting) %>%
-  summarize(
-    n = n()
-  ) %>%
-  ungroup() %>%
-  group_by(cont_setting) %>%
-  summarize(
-    avg_n = mean(n)
-  )
-
-
-pop_grp1 <- subset(person_db, resp_age %in% c(60:65))
-all_contacts <- subset(contact_db, resp_id %in% c(pop_grp1$resp_id))
-all_contacts %>%
-  group_by(resp_id, cont_setting) %>%
-  summarize(
-    n = n()
-  ) %>%
-  ungroup() %>%
-  group_by(cont_setting) %>%
-  summarize(
-    avg_n = mean(n)
-  )
-
-pop_grp1 <- subset(person_db, resp_age %in% c(10:18))
-all_contacts <- subset(contact_db, resp_id %in% c(pop_grp1$resp_id))
-all_contacts %>%
-  group_by(resp_id, cont_setting) %>%
-  summarize(
-    n = n()
-  ) %>%
-  ungroup() %>%
-  group_by(cont_setting) %>%
-  summarize(
-    avg_n = mean(n)
-  )
-
-
-
-## Requires accessing_and_extracting_data.R
-resp_imp = read.csv(file.path(xdir, "imputed_resp.csv"))  # change if the data was saved in a different folder
-cont_imp = read.csv(file.path(xdir, "imputed_cont.csv"))  # change if the data was saved in a different folder
-
-## LIBRARIES
-ps = c("dplyr", "mgcv", "tidyr")
-
-lapply(ps, function(x){
-  if(!require(x, character.only = T)){
-    install.packages(x)
-  }
-  library(x, character.only = T)
-
-  x
-})
-
-#### ESTIMATING AGE-SPECIFIC CONTACT MATRICES ####
+# /////////////////////////////////////////////////////////////////////////////
+# =============================================================================
+# MERGE DATASETS
+# =============================================================================
+# /////////////////////////////////////////////////////////////////////////////
 
 ## Merge datasets
-merged.df = left_join(resp_imp, cont_imp, by = "resp_id")
-
+merged.df = resp_imp[cont_imp, on = "resp_id"]
+dim(cont_imp)
+dim(merged.df)
 head(merged.df)
 
-
-
-
-## Binary variable to denote whether respondent reported contacts (or reported contacts in a particular setting)
-## 0 = no contact (in this setting); 1 = reported at least 1 contact (in this setting)
-
+## Binary variable to denote whether respondent reported contacts
+## (or reported contacts in a particular setting)
+## 0 = no contact (in this setting);
+## 1 = reported at least 1 contact (in this setting)
 settings = unique(merged.df$cont_setting)
 settings
 
-
 ## Create dummy variables for individual settings
+## this works the opposite that it should, so I'm switching it
 for(x in settings){
-  merged.df[, paste("cont_", tolower(as.character(x)))] = ifelse(merged.df$cont_setting == x, 0, 1)
+  cat(x, "\n")
+  rr <- paste0("cont_", tolower(as.character(x)))
+  merged.df[, rr] = ifelse(merged.df$cont_setting == x, 1, 0)
 }
 
-cont_cols = paste("cont_", tolower(as.character(settings)))
-# substitute with the variable(s) that denote needed setting
+head(merged.df)
 
-nocont = rowSums(!is.na(merged.df[, cont_cols])) == 0
-merged.df$binary_col = ifelse(nocont, 0, 1)
+# /////////////////////////////////////////////////////////////////////////////
+# =============================================================================
+# CHOOSE WHICH ONE YOU ARE LOOKING FOR
+# =============================================================================
+# /////////////////////////////////////////////////////////////////////////////
 
-## Single-year age-specific contact matrices
-# weighted number of respondents ##
-age_matrix_n = resp_imp %>%
-  group_by(resp_age) %>%
-  summarise(n = sum(weight, na.rm = TRUE))
+xenv = "Total"
+xenv = "household"
+
+if(xenv == "Total") {
+  merged.df[,binary_col := 1]
+} else {
+  xcol = paste0("cont_", xenv)
+  merged.df[,binary_col := get(xcol)]
+}
+
+head(merged.df)
+
+# /////////////////////////////////////////////////////////////////////////////
+# =============================================================================
+# Single-year age-specific contact matrices
+# =============================================================================
+# /////////////////////////////////////////////////////////////////////////////
 
 ## prediction ages ##
-nd = expand.grid(resp_age = c(0:max(merged.df$resp_age)),
-                 cont_age = c(0:max(merged.df$resp_age)))
-
-predict.m = as.data.frame(nd)
-
-## Define the settings for matrix calculations ##
-setting_names = c("binary_col") ## more can be added (household, school, work, other) from "cont_cols"
-
-#### Smoothed matrices ####
+predict.m = setDT(expand.grid(
+  resp_age = c(0:max(merged.df$resp_age)),
+  cont_age = c(0:max(merged.df$resp_age))))
 
 # obtain the weighted sum of contacts per respondent-contact group
-age_matrix_s = merged.df %>%
-  filter(!is.na(cont_age)) %>%
-  arrange(cont_age) %>%
-  group_by(cont_age, resp_age) %>%
-  summarise(weighted_sum =
-              sum(weight*!!sym(setting_names), na.rm = T))
+age_matrix_s = merged.df[,
+  .(weighted_sum = sum(weight * binary_col, na.rm = T)),
+  by = .(cont_age, resp_age)
+]
 
 # combine weighted sum with the data for predictions
-age_matrix_s = left_join(predict.m, age_matrix_s)
+age_matrix_s = age_matrix_s[predict.m, on = c("cont_age", "resp_age")]
 
 # change NAs to 0s
 age_matrix_s$weighted_sum[is.na(age_matrix_s$weighted_sum)] = 0
 
 # combine total weighted contact sum with weighted N of people
-age_matrix_s = left_join(age_matrix_s, age_matrix_n)
-
-# order
-age_matrix_s = age_matrix_s[order(age_matrix_s[,"resp_age"],
-                                  age_matrix_s[,"cont_age"]),]
+age_matrix_s = age_matrix_s[age_matrix_n, on = c("resp_age")]
 
 # average number of contacts for the matrix
-age_matrix_s$ncont = age_matrix_s$weighted_sum/age_matrix_s$n
+age_matrix_s[, ncont := weighted_sum/n]
 
 # GAM (estimating smoothing)
 model = gam(ncont ~ te(as.numeric(resp_age), as.numeric(cont_age),
                        k = c(10,10), # k=10 fits our data best
-                       bs = c("cc","cc"), # cc = cyclic cubic spline (best suited for our data)
+                       bs = c("cc","cc"), # cc = cyclic cubic spline
+                                          # (best suited for our data)
                        m = c(0,0)),
             family = nb(),
             data = age_matrix_s)
+
 ## For work contacts, the cc smoothing spline does not provide sufficient flexibility.
 ## Consider using thin plate (tp) regression spline that allows for more flexibility
 #  in modeling complex multi-dimensional and non-linear relationships.
@@ -163,99 +172,10 @@ model = gam(ncont ~ te(as.numeric(resp_age), as.numeric(cont_age),
 # predictions (predicting smoothed contact matrices)
 age_matrix_s$pred = predict(model, newdata = age_matrix_s, type = "response")
 
-#### Contact matrices using 5-year age brackets ####
-## Set age brackets
-age.breaks = list("_by5_80" = c(seq(0,80, by = 5), 120)) ## should be a named list, can create multiple age groups
-
-## Create age group labels
-group.lbls = lapply(age.breaks, function(x) {
-  maxv = x[length(x)]
-  if (maxv > max(merged.df[,c("resp_age", "cont_age")], na.rm = TRUE)) {
-    mylabels = c(
-      paste(x[1:(length(x)-2)], x[2:(length(x)-1)] - 1, sep = "-"),
-      paste0(x[length(x)-1], "+")
-    )
-  } else {
-    mylabels = paste(
-      x[1:(length(x)-1)],
-      x[2:length(x)] - 1,
-      sep = "-"
-    )
-  }
-})
-
-## Create age group variables for respondents (in merged and respondent data) and contacts
-for(i in seq_along(age.breaks)){ # the list may contain multiple age groups
-  ## in merged dataset
-  for(x in c("resp_age", "cont_age")){
-    tmp.names = paste0(x, names(age.breaks)[i])
-    merged.df[,tmp.names] = cut(merged.df[,x],
-                                breaks = age.breaks[[i]],
-                                labels = group.lbls[[i]],
-                                right = FALSE
-    )
-  }
-  ## in respondent dataset
-  tmp.names = paste0("resp_age", names(age.breaks)[i])
-  resp_imp[,tmp.names] = cut(resp_imp[,"resp_age"],
-                             breaks = age.breaks[[i]],
-                             labels = group.lbls[[i]],
-                             right = FALSE
-  )
-}
-
-## weighted N of resp ##
-age_matrix_n = resp_imp %>%
-  group_by(resp_age_by5_80) %>%
-  summarise(n = sum(weight, na.rm = TRUE))
-
-## all age group combinations ##
-## in case some combinations are missing from the sample ##
-nd = expand.grid(resp_age_by5_80 = levels(merged.df$resp_age_by5_80),
-                 cont_age_by5_80 = levels(merged.df$cont_age_by5_80))
-predict.m = as.data.frame(nd)
-
-# obtain the weighted sum of contacts per respondent-contact group
-age_matrix = merged.df %>%
-  filter(!is.na(cont_age_by5_80)) %>% ## we exclude NA group from the contact matrix
-  arrange(cont_age_by5_80) %>%
-  group_by(cont_age_by5_80, resp_age_by5_80) %>%
-  summarise(weighted_sum = sum(weight*!!sym("binary_col"), na.rm = T))
-
-# combine weighted sum with the data for predictions
-age_matrix = left_join(predict.m, age_matrix)
-
-# change NAs to 0s
-age_matrix$weighted_sum[is.na(age_matrix$weighted_sum)] = 0
-
-# combine total weighted contact sum with weighted N of people
-age_matrix = left_join(age_matrix, age_matrix_n)
-
-# order
-age_matrix = age_matrix[order(age_matrix[,"resp_age_by5_80"],
-                              age_matrix[,"cont_age_by5_80"]),]
-
-# average number of contacts for the matrix
-age_matrix$ncont = age_matrix$weighted_sum/age_matrix$n
-
-# ## save the matrix as a data frame
-write.csv(age_matrix[, c("resp_age_by5_80", "cont_age_by5_80", "ncont")],
-          paste0("./Total-M-by5_80-df.csv"),
-          row.names = F)
-#
-# ## transform dataframe into matrix form
-# matrix_age5 = age_matrix %>%
-#   dplyr::select("resp_age_by5_80", "cont_age_by5_80", "ncont") %>%
-#   pivot_wider(names_from = "cont_age_by5_80", values_from = "ncont")
-
-# write.csv(matrix_age5,
-#           paste0("./Total-M-by5_80-matrix.csv"),
-#           row.names = F)
-
-
-ggplot(age_matrix_s) + # needs to be a data frame (long format of the data)
-  geom_raster(aes(x = resp_age, y = cont_age, fill = pred), interpolate = TRUE) +
-  ggtitle("Title") + # Main title
+# PLOT
+p1 <- ggplot(age_matrix_s) + # needs to be a data frame (long format of the data)
+  geom_tile(aes(x = resp_age, y = cont_age, fill = pred)) +
+  ggtitle(xenv) + # Main title
   xlab("Respondent Age") + # X-axis title
   ylab("Contact Age") + # Y-axis title
   scale_fill_viridis_c() +
@@ -272,9 +192,45 @@ ggplot(age_matrix_s) + # needs to be a data frame (long format of the data)
         plot.background = element_rect(fill = "transparent", color = NA)#,
   )
 
-ggplot(age_matrix) + # should be a data frame (long format)
+# /////////////////////////////////////////////////////////////////////////////
+# =============================================================================
+# Single-year age-factor contact matrices
+# =============================================================================
+# /////////////////////////////////////////////////////////////////////////////
+
+## all age group combinations ##
+## in case some combinations are missing from the sample ##
+predict.m_fct = setDT(
+  expand.grid(resp_age_by5_80 = levels(merged.df$resp_age_by5_80),
+              cont_age_by5_80 = levels(merged.df$cont_age_by5_80))
+)
+
+# obtain the weighted sum of contacts per respondent-contact group
+age_matrix_s_fct = merged.df[,
+  .(weighted_sum = sum(weight * binary_col, na.rm = T)),
+  by = .(cont_age_by5_80, resp_age_by5_80)
+]
+
+# combine weighted sum with the data for predictions
+age_matrix_s_fct = age_matrix_s_fct[
+  predict.m_fct,
+  on = c("cont_age_by5_80", "resp_age_by5_80")]
+
+# change NAs to 0s
+age_matrix_s_fct$weighted_sum[is.na(age_matrix_s_fct$weighted_sum)] = 0
+
+# combine total weighted contact sum with weighted N of people
+age_matrix_s_fct = age_matrix_s_fct[age_matrix_n_fct, on = c("resp_age_by5_80")]
+
+# average number of contacts for the matrix
+age_matrix_s_fct[, ncont := weighted_sum/n]
+
+age_matrix_s_fct
+
+# PLOT
+p2  <- ggplot(age_matrix_s_fct) + # should be a data frame (long format)
   geom_tile(aes(x = resp_age_by5_80, y = cont_age_by5_80, fill = ncont)) +
-  ggtitle("Total") + # Main title
+  ggtitle(xenv) + # Main title
   xlab("Respondent Age") + # X-axis title
   ylab("Contact Age") + # Y-axis title
   # scale_fill_gradientn(colors = c("#005f87", "#87afd7", "lightblue")
@@ -291,36 +247,66 @@ ggplot(age_matrix) + # should be a data frame (long format)
         plot.background = element_rect(fill = "transparent", color = NA)
   )
 
-# pick out one slice
-head(age_matrix)
 
-age_matrix %>%
-  filter(resp_age_by5_80 == '0-4')
+age_matrix_s_fct = merged.df[,
+                             .(weighted_sum = sum(weight * binary_col, na.rm = T)),
+                             by = .(cont_age_by5_80, resp_age_by5_80)
+]
 
-# # make the overall graphs
-x.merged.df <- merged.df %>%
-  group_by(resp_id, resp_age_by5_80) %>%
-  summarize(.groups = 'keep',
-            n_contacts_crude  = n(),
-            sum_weights = sum(weight, na.rm = T),
-            mean_weights = mean(weight, na.rm = T)) %>%
-  arrange(resp_age_by5_80) %>%
-  ungroup() %>%
-  group_by(resp_age_by5_80) %>%
-  summarize(
-    xmean = mean(sum_weights),
-    xlb = quantile(sum_weights, probs = 0.25),
-    xub = quantile(sum_weights, probs = 0.75)
-  ) %>%
-  mutate(fct_int = -1*as.integer(resp_age_by5_80))
+#
+head(age_matrix_s_fct)
+subset(age_matrix_s_fct, resp_age_by5_80 == '[0,5]')
 
-head(x.merged.df)
 
-library(ggpubr)
 
-ggplot(x.merged.df) + theme_classic2() +
-  geom_col(aes(y = reorder(resp_age_by5_80, fct_int), x = xmean), fill = 'lightblue') +
-  geom_errorbar(aes(xmin = xlb, xmax = xub,  y = reorder(resp_age_by5_80, fct_int)),
-                width = 0.5) +
-  scale_x_continuous(breaks = seq(0, 14, by = 2)) +
-  theme(panel.grid.major.x = element_line(color = 'grey75', linewidth = 0.1))
+# /////////////////////////////////////////////////////////////////////////////
+# =============================================================================
+# Age-grp plot
+# =============================================================================
+# /////////////////////////////////////////////////////////////////////////////
+
+# obtain the weighted sum of contacts per respondent-contact group
+age_matrix_s_fct_pp = merged.df[,
+  .(ind_weighted_sum = sum(weight * binary_col, na.rm = T)),
+  by = .(resp_age_by5_80, resp_id)
+]
+
+age_matrix_s_fct_pp
+
+age_matrix_s_fct_2 = age_matrix_s_fct_pp[,
+  .(weighted_avg = mean(ind_weighted_sum, na.rm = T),
+    weighted_sd = sd(ind_weighted_sum, na.rm = T)),
+  by = .(resp_age_by5_80)
+]
+setorderv(age_matrix_s_fct_2, "resp_age_by5_80")
+
+age_matrix_s_fct_2
+
+# also plot the total contacts by age group
+age_matrix_s_fct_sum = age_matrix_s_fct[,
+  .(ncont_sum = sum(ncont)),
+  by = resp_age_by5_80
+]
+
+# you could get this by age group
+p3 <- ggplot(age_matrix_s_fct_2) +
+  geom_col(aes(x = resp_age_by5_80, y = weighted_avg)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        plot.title = element_text(hjust = 0.5, size = 16),
+        axis.title = element_text(size = 12),
+        axis.text = element_text(size = 10),
+        panel.grid.major.y = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.background = element_rect(fill = "transparent", color = "black"),
+        plot.background = element_rect(fill = "transparent", color = NA))
+
+p3
+
+# /////////////////////////////////////////////////////////////////////////////
+# =============================================================================
+# Joined plot
+# =============================================================================
+# /////////////////////////////////////////////////////////////////////////////
+
+p2 + p3
+
