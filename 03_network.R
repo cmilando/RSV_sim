@@ -7,6 +7,39 @@
 # do this for each environment then join individuals together
 # ****
 
+# ****
+# maybe what you do is
+# - do one person at a time
+# - when one person selects another
+# - mark that connection in the other persons clique as well
+# - and reduce their probability by 1 so p_new = max(0, p_curr - 1)
+# - and reduce their clique size total by 1 using the same function
+# ****
+
+# ****
+# how do you keep it from being a really long chain
+# rather than small pods
+# -- there must be something that you can quantify, where its
+# -- the thing is, the clique is across all age groups
+# so when you know the network size
+# and you have the contact matrix
+# how to enforce that little networks emerge
+# maybe the best thing to do is to start with doing it completely randomly
+# and then decide?
+# ****
+
+# ****
+# there is also an angle where the duration of contact needs to come into play
+# right because there is a time-dimension
+# where the duration of contact needs to be a function of
+# the amoung of time so it amounts to the same level of contact
+# ****
+
+# ****
+# also think about whether this needs to be triangular or not
+# think about educator vs student
+# ****
+
 # so whats a really simple example here for this
 #
 
